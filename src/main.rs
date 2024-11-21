@@ -15,8 +15,8 @@ fn main() {
         process::exit(1);
     });
 
-    if let Err(e) = sasm2::run(config) {
-        println!("Application error: {e}");
-        process::exit(1);
+    match sasm2::run(config) {
+        Ok(_) => println!("Assembly complete"),
+        Err(s) => println!("{s}"),
     }
 }

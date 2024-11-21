@@ -1,15 +1,23 @@
-use std::error::Error;
-use std::fs;
-
 mod types;
 use crate::types::*;
 
-pub struct Config {
-    pub input_file_path: String,
-    pub output_file_path: String,
+pub enum IType<'a> {
+    STRING(&'a str),
+    FILE(String),
 }
 
-impl Config {
+pub enum OType {
+    STDOUT,
+    STRING,
+    FILE(String),
+}
+
+pub struct Config<'a> {
+    itype: IType<'a>,
+    otype: OType,
+}
+
+impl Config<'_> {
     pub fn build(args: &[String]) -> Result<Config, &str> {
         // Should have been checked by main
         assert!(args.len() > 1);
@@ -18,12 +26,17 @@ impl Config {
             return Err("Missing output file path");
         }
 
-        let input_file_path = args[1].clone();
-        let output_file_path = args[2].clone();
         Ok(Config {
-            input_file_path,
-            output_file_path,
+            itype: IType::FILE(args[1].clone()),
+            otype: OType::FILE(args[2].clone()),
         })
+    }
+
+    pub fn build_string_test<'a>(input_string: &'a str) -> Config<'a> {
+        Config {
+            itype: IType::STRING(input_string),
+            otype: OType::STRING,
+        }
     }
 }
 
@@ -76,17 +89,20 @@ pub fn tokenize(line: &str) -> Result<SourceLine, &str> {
     }
 }
 
-pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
-    let contents = fs::read_to_string(config.input_file_path)?;
+pub fn run(config: Config) -> Result<String, String> {
+    let assembly = match config.itype {
+        IType::STRING(s) => s,
+        IType::FILE(s) => &std::fs::read_to_string(s).expect("Unable to read input file"),
+    };
 
-    for (line_num, line) in contents.lines().enumerate() {
+    for (line_num, line) in assembly.lines().enumerate() {
         match tokenize(line) {
-            Ok(_) => todo!(),
-            Err(s) => return Err(format!("{line_num}: {s}").into()),
-        }
+            Ok(_) => (),
+            Err(s) => return Err(format!("{line_num}: {s}")),
+        };
     }
 
-    Ok(())
+    Ok("".to_string())
 }
 
 #[cfg(test)]
