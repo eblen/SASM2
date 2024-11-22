@@ -85,7 +85,7 @@ pub fn tokenize(line: &str) -> Result<SourceLine, &str> {
                 UInt::U8(_) => Err("org must be a 2-byte address"),
                 UInt::U16(u) => Ok(SourceLine::Org(u)),
             }
-        },
+        }
 
         "data" => {
             if words.len() != 2 {
@@ -95,8 +95,20 @@ pub fn tokenize(line: &str) -> Result<SourceLine, &str> {
                 Ok(v) => Ok(SourceLine::Data(v)),
                 Err(_) => Err("data must be a valid hex string"),
             }
-        },
+        }
+
         _ => Err("not a valid keyword"),
+    }
+}
+
+fn write_assembly_to_file(f: &str, s: &str) -> Result<(), String> {
+    match std::fs::exists(f) {
+        Ok(true) => Err(format!("File {f} already exists")),
+        Ok(false) => match std::fs::write(f, s) {
+            Ok(_) => Ok(()),
+            Err(_) => Err(format!("Unable to write to file {f}")),
+        },
+        Err(_) => Err(format!("Unable to check existence of file {f}")),
     }
 }
 
@@ -119,7 +131,11 @@ pub fn run(config: Config) -> Result<String, String> {
     match config.otype {
         OType::STDOUT => println!("{s}"),
         OType::STRING => return Ok(s),
-        OType::FILE(_) => (),
+        OType::FILE(f) => {
+            if let Err(e) = write_assembly_to_file(&f, &s) {
+                return Err(format!("Error: {e}"));
+            }
+        }
     }
 
     Ok("".to_string())
