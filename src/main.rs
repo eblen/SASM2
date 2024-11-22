@@ -1,7 +1,7 @@
 use std::env;
 use std::process;
 
-use sasm2::Config;
+use sasm2::{Config, OType};
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -14,9 +14,10 @@ fn main() {
         println!("{err}");
         process::exit(1);
     });
+    let should_print = matches!(config.otype, OType::STRING);
 
     match sasm2::run(config) {
-        Ok(_) => println!("Assembly complete"),
-        Err(s) => println!("{s}"),
+        Ok(s) => if should_print {println!("{s}")},
+        Err(s) => eprintln!("{s}"),
     }
 }

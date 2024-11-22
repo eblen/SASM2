@@ -1,5 +1,6 @@
-mod types;
-use crate::types::*;
+mod output;
+mod syntax;
+use crate::syntax::*;
 
 pub enum IType<'a> {
     STRING(&'a str),
@@ -13,8 +14,8 @@ pub enum OType {
 }
 
 pub struct Config<'a> {
-    itype: IType<'a>,
-    otype: OType,
+    pub itype: IType<'a>,
+    pub otype: OType,
 }
 
 impl Config<'_> {
@@ -84,7 +85,17 @@ pub fn tokenize(line: &str) -> Result<SourceLine, &str> {
                 UInt::U8(_) => Err("org must be a 2-byte address"),
                 UInt::U16(u) => Ok(SourceLine::Org(u)),
             }
-        }
+        },
+
+        "data" => {
+            if words.len() != 2 {
+                return Err("data takes one argument");
+            }
+            match hex::decode(words[1]) {
+                Ok(v) => Ok(SourceLine::Data(v)),
+                Err(_) => Err("data must be a valid hex string"),
+            }
+        },
         _ => Err("not a valid keyword"),
     }
 }
@@ -95,11 +106,20 @@ pub fn run(config: Config) -> Result<String, String> {
         IType::FILE(s) => &std::fs::read_to_string(s).expect("Unable to read input file"),
     };
 
+    let mut source = Vec::new();
     for (line_num, line) in assembly.lines().enumerate() {
         match tokenize(line) {
-            Ok(_) => (),
+            Ok(s) => source.push(s),
             Err(s) => return Err(format!("{line_num}: {s}")),
         };
+    }
+
+    let s = output::hex_format(&source);
+
+    match config.otype {
+        OType::STDOUT => println!("{s}"),
+        OType::STRING => return Ok(s),
+        OType::FILE(_) => (),
     }
 
     Ok("".to_string())

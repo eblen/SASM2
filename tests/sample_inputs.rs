@@ -25,3 +25,23 @@ fn org_address_missing() {
 fn org_address_fine() {
     run_string_test("org ABCD", true, "");
 }
+
+#[test]
+fn data_forward() {
+    run_string_test("data CaFe", true, "cafe");
+}
+
+#[test]
+fn data_odd_size() {
+    run_string_test("data cafedad", false, "0: data must be a valid hex string");
+}
+
+#[test]
+fn data_non_hex() {
+    run_string_test("data coffee", false, "0: data must be a valid hex string");
+}
+
+#[test]
+fn data_with_spaces() {
+    run_string_test("data cafe dad", false, "0: data takes one argument");
+}

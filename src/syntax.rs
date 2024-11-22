@@ -10,14 +10,15 @@ pub enum Offset {
     Label(String),
 }
 
-pub enum SourceLine<'a> {
+pub enum SourceLine {
     // Empty lines after removing comments
     Blank,
 
-    // org, label, and zbyte keywords
+    // Keywords
     Org(u16),
     Label(String, UInt),
     Zbyte(String, u8),
+    Data(Vec<u8>),
 
     // Isolated labels
     LabelCodeLocation(String),
@@ -25,7 +26,4 @@ pub enum SourceLine<'a> {
     // Instruction lines
     Instr(String, UInt),
     InstrWithLabel(String, String, Offset),
-
-    // Lines starting with "data" keyword
-    Rawdata(&'a [u8]),
 }
