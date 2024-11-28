@@ -1,6 +1,8 @@
 mod output;
 mod syntax;
+mod zpm;
 use crate::syntax::*;
+use crate::zpm::*;
 
 pub enum IType<'a> {
     STRING(&'a str),
@@ -16,6 +18,7 @@ pub enum OType {
 pub struct Config<'a> {
     pub itype: IType<'a>,
     pub otype: OType,
+    pub zpm: Zpm,
 }
 
 impl Config<'_> {
@@ -24,12 +27,22 @@ impl Config<'_> {
         assert!(args.len() > 1);
 
         if args.len() < 3 {
-            return Err("Missing output file path");
+            return Err(help());
         }
+
+        let sys: Zpm;
+        if args.len() > 3 {
+            sys = Zpm::new(&args[3])?;
+        } else {
+            sys = Zpm::new_for_apple();
+        }
+
+        println!("{:?}", sys);
 
         Ok(Config {
             itype: IType::FILE(args[1].clone()),
             otype: OType::FILE(args[2].clone()),
+            zpm: sys,
         })
     }
 
@@ -37,12 +50,14 @@ impl Config<'_> {
         Config {
             itype: IType::STRING(input_string),
             otype: OType::STRING,
+            zpm: Zpm::new_for_apple(),
         }
     }
 }
 
 pub fn help() -> &'static str {
-    return "Usage: sasm <assembly input file> <binary output file>";
+    return "Usage: sasm <assembly input file> <binary output file> <system (optional)>\n\
+            Possible systems: appleII (default) or atari2600";
 }
 
 fn hex_to_uint(s: &str) -> Result<UInt, &str> {
