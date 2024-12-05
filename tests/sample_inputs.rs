@@ -45,3 +45,53 @@ fn data_non_hex() {
 fn data_with_spaces() {
     run_string_test("data cafe dad", false, "0: data takes one argument");
 }
+
+#[test]
+fn zbyte_size_too_big() {
+    run_string_test("zbyte z cafe", false, "0: zbyte array size must be a single byte (< 0x100)");
+}
+
+#[test]
+fn zbyte_odd_size() {
+    run_string_test("zbyte z dad", false, "0: not a valid hexadecimal number");
+}
+
+#[test]
+fn zbyte_non_hex() {
+    run_string_test("zbyte z pa", false, "0: not a valid hexadecimal number");
+}
+
+#[test]
+fn label_odd_size() {
+    run_string_test("label l dad", false, "0: not a valid hexadecimal number");
+}
+
+#[test]
+fn label_non_hex() {
+    run_string_test("label l pa", false, "0: not a valid hexadecimal number");
+}
+
+#[test]
+fn instr_op_odd_size() {
+    run_string_test("xxx dad", false, "0: not a valid hexadecimal number");
+}
+
+#[test]
+fn instr_op_non_hex() {
+    run_string_test("xxx john", false, "0: not a valid hexadecimal number");
+}
+
+#[test]
+fn instr_offset_too_big() {
+    run_string_test("xxx .op cafe", false, "0: offset must be a single byte (< 0x100)");
+}
+
+#[test]
+fn instr_offset_odd_size() {
+    run_string_test("xxx ff dad", false, "0: not a valid hexadecimal number");
+}
+
+#[test]
+fn instr_offset_non_hex() {
+    run_string_test("xxx ff john", false, "0: not a valid hexadecimal number");
+}

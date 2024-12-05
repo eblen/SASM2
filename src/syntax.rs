@@ -1,13 +1,19 @@
 // Enums for tokenizing source code lines
-
 pub enum UInt {
     U8(u8),
     U16(u16),
 }
 
-pub enum Offset {
-    Byte(u8),
+pub enum Op {
+    UInt(UInt),
     Label(String),
+    None,
+}
+
+pub enum Offset {
+    U8(u8),
+    Label(String),
+    None,
 }
 
 pub enum SourceLine {
@@ -21,9 +27,8 @@ pub enum SourceLine {
     Data(Vec<u8>),
 
     // Isolated labels
-    LabelCodeLocation(String),
+    CodeMarker(String),
 
     // Instruction lines
-    Instr(String, UInt),
-    InstrWithLabel(String, String, Offset),
+    Instr(String, Op, Offset),
 }

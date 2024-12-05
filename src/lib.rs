@@ -102,6 +102,26 @@ pub fn tokenize(line: &str) -> Result<SourceLine, &str> {
             }
         }
 
+        "label" => {
+            if words.len() != 3 {
+                return Err("label takes two arguments");
+            }
+
+            match hex_to_uint(words[2])? {
+                UInt::U8(u) => Ok(SourceLine::Label(words[1].to_string(), UInt::U8(u))),
+                UInt::U16(u) => Ok(SourceLine::Label(words[1].to_string(), UInt::U16(u))),
+            }
+        }
+
+        "zbyte" => match words.len() {
+            2 => Ok(SourceLine::Zbyte(words[1].to_string(), 1)),
+            3 => match hex_to_uint(words[2])? {
+                UInt::U8(u) => Ok(SourceLine::Zbyte(words[1].to_string(), u)),
+                UInt::U16(_) => Err("zbyte array size must be a single byte (< 0x100)"),
+            },
+            _ => Err("zbyte takes one or two arguments"),
+        },
+
         "data" => {
             if words.len() != 2 {
                 return Err("data takes one argument");
@@ -112,7 +132,34 @@ pub fn tokenize(line: &str) -> Result<SourceLine, &str> {
             }
         }
 
-        _ => Err("not a valid keyword"),
+        // Assume an instruction
+        _ => {
+            let mut op = Op::None;
+            let mut offset = Offset::None;
+
+            // Tokenize operand
+            if words.len() > 1 {
+                op = if words[1].starts_with('.') {
+                    Op::Label(words[1][1..].to_string())
+                } else {
+                    Op::UInt(hex_to_uint(words[1])?)
+                }
+            }
+
+            // Tokenize offset
+            if words.len() > 2 {
+                offset = if words[2].starts_with('.') {
+                    Offset::Label(words[2][1..].to_string())
+                } else {
+                    Offset::U8(match hex_to_uint(words[2])? {
+                        UInt::U8(u) => u,
+                        UInt::U16(_) => return Err("offset must be a single byte (< 0x100)"),
+                    })
+                }
+            }
+
+            Ok(SourceLine::Instr(words[0].to_string(), op, offset))
+        }
     }
 }
 
