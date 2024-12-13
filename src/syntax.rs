@@ -13,7 +13,6 @@ pub enum Op {
 pub enum Offset {
     U8(u8),
     Label(String),
-    None,
 }
 
 pub enum SourceLine {

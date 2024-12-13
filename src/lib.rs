@@ -1,6 +1,9 @@
+mod data;
 mod output;
 mod syntax;
 mod zpm;
+
+use crate::data::*;
 use crate::syntax::*;
 use crate::zpm::*;
 
@@ -134,10 +137,8 @@ pub fn tokenize(line: &str) -> Result<SourceLine, &str> {
 
         // Assume an instruction
         _ => {
-            let mut op = Op::None;
-            let mut offset = Offset::None;
-
             // Tokenize operand
+            let mut op = Op::None;
             if words.len() > 1 {
                 op = if words[1].starts_with('.') {
                     Op::Label(words[1][1..].to_string())
@@ -147,6 +148,7 @@ pub fn tokenize(line: &str) -> Result<SourceLine, &str> {
             }
 
             // Tokenize offset
+            let mut offset = Offset::U8(0);
             if words.len() > 2 {
                 offset = if words[2].starts_with('.') {
                     Offset::Label(words[2][1..].to_string())
@@ -188,7 +190,63 @@ pub fn run(config: Config) -> Result<String, String> {
         };
     }
 
-    let s = output::hex_format(&source);
+    let mut disassembly: Vec<u8> = Vec::new();
+    for s in source {
+        match s {
+            SourceLine::Org(_) => (),
+            SourceLine::Data(d) => disassembly.extend(d),
+            SourceLine::Instr(mnemonic, input_op, offset_type) => {
+                // Store opcode
+                let instr_info = get_instr_info(&mnemonic)?;
+                disassembly.push(instr_info.opcode);
+
+                // Compute offset
+                let offset: u8;
+                match offset_type {
+                    Offset::U8(u) => offset = u,
+                    Offset::Label(_) => todo!(),
+                }
+
+                match input_op {
+                    Op::None => match instr_info.op{
+                        OpType::None => (),
+                        OpType::U8 => return Err("Instruction requires a single-byte operand".to_string()),
+                        OpType::U16 => return Err("Instruction requires a two-byte operand".to_string()),
+                    },
+                    Op::Label(_) => todo!(),
+                    Op::UInt(ui_type) => match ui_type {
+                        UInt::U8(u) => match instr_info.op {
+                            OpType::None => return Err("Instruction does not require an operand".to_string()),
+                            OpType::U8 => {
+                               if u as u16 + offset as u16 > 0xff {
+                                   return Err("Operand plus offset is > 0xff".to_string());
+                               } else {
+                                   disassembly.push(u + offset);
+                               }
+                            },
+                            OpType::U16 => return Err("Instruction requires a two-byte operand".to_string()),
+                        },
+                        UInt::U16(u) => match instr_info.op {
+                            OpType::None => return Err("Instruction does not require an operand".to_string()),
+                            OpType::U8 => return Err("Instruction requires a single-byte operand".to_string()),
+                            OpType::U16 => {
+                               if u as u32 + offset as u32 > 0xffff {
+                                   return Err("Operand plus offset is > 0xffff".to_string());
+                               } else {
+                                   let bytes = (u + offset as u16).to_le_bytes();
+                                   disassembly.push(bytes[0]);
+                                   disassembly.push(bytes[1]);
+                               }
+                            },
+                        },
+                    },
+                }
+            }
+            _ => todo!(),
+        }
+    }
+
+    let s = output::hex_format(&disassembly);
 
     match config.otype {
         OType::STDOUT => println!("{s}"),
