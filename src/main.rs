@@ -17,7 +17,11 @@ fn main() {
     let should_print = matches!(config.otype, OType::STRING);
 
     match sasm2::run(config) {
-        Ok(s) => if should_print {println!("{s}")},
+        Ok(s) => {
+            if should_print {
+                println!("{s}")
+            }
+        }
         Err(s) => eprintln!("{s}"),
     }
 }

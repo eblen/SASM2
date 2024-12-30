@@ -17,11 +17,15 @@ impl Zpm {
     // Attempt to create a variant from a string
     pub fn new(arch: &str) -> Result<Self, &str> {
         if arch.to_ascii_lowercase().starts_with("apple") {
-            return Ok(Zpm::Apple{bytes_remaining: 0x100});
+            return Ok(Zpm::Apple {
+                bytes_remaining: 0x100,
+            });
         }
 
         if arch.to_ascii_lowercase().starts_with("atari") {
-            return Ok(Zpm::Atari2600{next_free_byte: 0x80});
+            return Ok(Zpm::Atari2600 {
+                next_free_byte: 0x80,
+            });
         }
 
         Err("Unrecognized or unsupported system")
@@ -35,7 +39,7 @@ impl Zpm {
             // high to low memory. A program that uses lots of zero-page bytes
             // will need a more sophisticated manager. It also will have to
             // consider the specific Apple II model being used.
-            Zpm::Apple {bytes_remaining: b} => {
+            Zpm::Apple { bytes_remaining: b } => {
                 if size == 0 {
                     panic!("Request to allocate zero bytes of zero page memory");
                 }
@@ -54,7 +58,7 @@ impl Zpm {
             // The stack normally starts at ff and grows down, which means that
             // the lower addresses should be preferred. Accordingly, this
             // manager allocates memory in order from 0x80 to 0xff.
-            Zpm::Atari2600 {next_free_byte: b} => {
+            Zpm::Atari2600 { next_free_byte: b } => {
                 if size == 0 {
                     panic!("Request to allocate zero bytes of zero page memory");
                 }

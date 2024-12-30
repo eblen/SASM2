@@ -49,7 +49,11 @@ fn data_with_spaces() {
 
 #[test]
 fn zbyte_size_too_big() {
-    run_string_test("zbyte z cafe", false, "0: zbyte array size must be a single byte (< 0x100)");
+    run_string_test(
+        "zbyte z cafe",
+        false,
+        "0: zbyte array size must be a single byte (< 0x100)",
+    );
 }
 
 #[test]
@@ -84,7 +88,11 @@ fn instr_op_non_hex() {
 
 #[test]
 fn instr_offset_too_big() {
-    run_string_test("xxx .op cafe", false, "0: offset must be a single byte (< 0x100)");
+    run_string_test(
+        "xxx .op cafe",
+        false,
+        "0: offset must be a single byte (< 0x100)",
+    );
 }
 
 #[test]
@@ -120,7 +128,11 @@ fn op_too_small() {
 
 #[test]
 fn op_too_big() {
-    run_string_test("ldyi cafe", false, "Instruction requires a single-byte operand");
+    run_string_test(
+        "ldyi cafe",
+        false,
+        "Instruction requires a single-byte operand",
+    );
 }
 
 #[test]

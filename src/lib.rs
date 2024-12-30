@@ -208,36 +208,48 @@ pub fn run(config: Config) -> Result<String, String> {
                 }
 
                 match input_op {
-                    Op::None => match instr_info.op{
+                    Op::None => match instr_info.op {
                         OpType::None => (),
-                        OpType::U8 => return Err("Instruction requires a single-byte operand".to_string()),
-                        OpType::U16 => return Err("Instruction requires a two-byte operand".to_string()),
+                        OpType::U8 => {
+                            return Err("Instruction requires a single-byte operand".to_string())
+                        }
+                        OpType::U16 => {
+                            return Err("Instruction requires a two-byte operand".to_string())
+                        }
                     },
                     Op::Label(_) => todo!(),
                     Op::UInt(ui_type) => match ui_type {
                         UInt::U8(u) => match instr_info.op {
-                            OpType::None => return Err("Instruction does not require an operand".to_string()),
+                            OpType::None => {
+                                return Err("Instruction does not require an operand".to_string())
+                            }
                             OpType::U8 => {
-                               if u as u16 + offset as u16 > 0xff {
-                                   return Err("Operand plus offset is > 0xff".to_string());
-                               } else {
-                                   disassembly.push(u + offset);
-                               }
-                            },
-                            OpType::U16 => return Err("Instruction requires a two-byte operand".to_string()),
+                                if u as u16 + offset as u16 > 0xff {
+                                    return Err("Operand plus offset is > 0xff".to_string());
+                                } else {
+                                    disassembly.push(u + offset);
+                                }
+                            }
+                            OpType::U16 => {
+                                return Err("Instruction requires a two-byte operand".to_string())
+                            }
                         },
                         UInt::U16(u) => match instr_info.op {
-                            OpType::None => return Err("Instruction does not require an operand".to_string()),
-                            OpType::U8 => return Err("Instruction requires a single-byte operand".to_string()),
+                            OpType::None => {
+                                return Err("Instruction does not require an operand".to_string())
+                            }
+                            OpType::U8 => {
+                                return Err("Instruction requires a single-byte operand".to_string())
+                            }
                             OpType::U16 => {
-                               if u as u32 + offset as u32 > 0xffff {
-                                   return Err("Operand plus offset is > 0xffff".to_string());
-                               } else {
-                                   let bytes = (u + offset as u16).to_le_bytes();
-                                   disassembly.push(bytes[0]);
-                                   disassembly.push(bytes[1]);
-                               }
-                            },
+                                if u as u32 + offset as u32 > 0xffff {
+                                    return Err("Operand plus offset is > 0xffff".to_string());
+                                } else {
+                                    let bytes = (u + offset as u16).to_le_bytes();
+                                    disassembly.push(bytes[0]);
+                                    disassembly.push(bytes[1]);
+                                }
+                            }
                         },
                     },
                 }
