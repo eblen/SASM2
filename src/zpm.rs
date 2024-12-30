@@ -31,7 +31,10 @@ impl Zpm {
         Err("Unrecognized or unsupported system")
     }
 
-    pub fn alloc(&mut self, size: u16) -> u8 {
+    pub fn alloc(&mut self, size: u8) -> u8 {
+        // Convert size to u16 for calculations
+        let size = size as u16;
+
         match self {
             // Apple II system-level programs, like the monitor and DOS, use the
             // lower addresses first and leave the higher addresses for user

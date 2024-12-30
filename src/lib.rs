@@ -3,6 +3,8 @@ mod output;
 mod syntax;
 mod zpm;
 
+use std::collections::HashMap;
+
 use crate::data::*;
 use crate::syntax::*;
 use crate::zpm::*;
@@ -117,9 +119,9 @@ pub fn tokenize(line: &str) -> Result<SourceLine, &str> {
         }
 
         "zbyte" => match words.len() {
-            2 => Ok(SourceLine::Zbyte(words[1].to_string(), 1)),
+            2 => Ok(SourceLine::ZByte(words[1].to_string(), 1)),
             3 => match hex_to_uint(words[2])? {
-                UInt::U8(u) => Ok(SourceLine::Zbyte(words[1].to_string(), u)),
+                UInt::U8(u) => Ok(SourceLine::ZByte(words[1].to_string(), u)),
                 UInt::U16(_) => Err("zbyte array size must be a single byte (< 0x100)"),
             },
             _ => Err("zbyte takes one or two arguments"),
@@ -176,16 +178,59 @@ fn write_assembly_to_file(f: &str, s: &str) -> Result<(), String> {
     }
 }
 
-pub fn run(config: Config) -> Result<String, String> {
+pub fn run(config: &mut Config) -> Result<String, String> {
     let assembly = match config.itype {
         IType::STRING(s) => s,
-        IType::FILE(s) => &std::fs::read_to_string(s).expect("Unable to read input file"),
+        IType::FILE(ref s) => &std::fs::read_to_string(s).expect("Unable to read input file"),
     };
 
+    // Main data structures
+    // Vector of tokenized source lines
     let mut source = Vec::new();
+
+    // Map of label names to value
+    let mut labels = HashMap::new();
+
+    // Current code byte
+    let mut code_byte: u16 = 0;
+
+    // First parser loop. Tokenizes source lines and collects labels.
     for (line_num, line) in assembly.lines().enumerate() {
         match tokenize(line) {
-            Ok(s) => source.push(s),
+            Ok(tokenized_line) => {
+                match tokenized_line {
+                    SourceLine::Blank => (),
+                    SourceLine::Org(_) => (),
+                    SourceLine::Label(ref s, u) => {
+                        if labels.contains_key(s) {
+                            return Err(format!("{line_num}: Label repeated"));
+                        }
+                        labels.insert(s.to_string(), u);
+                    }
+                    SourceLine::ZByte(ref s, size) => {
+                        if labels.contains_key(s) {
+                            return Err(format!("{line_num}: Label repeated"));
+                        }
+                        labels.insert(s.to_string(), UInt::U8(config.zpm.alloc(size)));
+                    }
+                    SourceLine::Data(ref d) => {
+                        code_byte += d.len() as u16;
+                    }
+                    SourceLine::CodeMarker(ref s) => {
+                        if labels.contains_key(s) {
+                            return Err(format!("{line_num}: Label repeated"));
+                        }
+                        labels.insert(s.to_string(), UInt::U16(code_byte));
+                    }
+                    SourceLine::Instr(ref mnemonic, _, _) => {
+                        code_byte += get_instr_size(mnemonic)? as u16;
+                    }
+                }
+
+                // Store all source lines so that next loop can refer to input
+                // by line number.
+                source.push(tokenized_line);
+            }
             Err(s) => return Err(format!("{line_num}: {s}")),
         };
     }
@@ -204,10 +249,28 @@ pub fn run(config: Config) -> Result<String, String> {
                 let offset: u8;
                 match offset_type {
                     Offset::U8(u) => offset = u,
-                    Offset::Label(_) => todo!(),
+                    Offset::Label(l) => match labels.get(&l) {
+                        Some(UInt::U8(u)) => offset = *u,
+                        Some(UInt::U16(_)) => {
+                            return Err("Offset must be a single byte".to_string())
+                        }
+                        None => panic!("Internal error: label found in second pass but not first"),
+                    },
                 }
 
-                match input_op {
+                // Handle labelled op. Unwrap it and convert it to a non-label variant.
+                let input_op_unwrapped: Op;
+                if let Op::Label(l) = input_op {
+                    input_op_unwrapped = match labels.get(&l) {
+                        Some(u) => Op::UInt(*u),
+                        None => panic!("Internal error: label found in second pass but not first"),
+                    }
+                } else {
+                    input_op_unwrapped = input_op;
+                }
+
+                match input_op_unwrapped {
+                    Op::Label(_) => panic!("Internal error: label found for unwrapped op"),
                     Op::None => match instr_info.op {
                         OpType::None => (),
                         OpType::U8 => {
@@ -217,7 +280,6 @@ pub fn run(config: Config) -> Result<String, String> {
                             return Err("Instruction requires a two-byte operand".to_string())
                         }
                     },
-                    Op::Label(_) => todo!(),
                     Op::UInt(ui_type) => match ui_type {
                         UInt::U8(u) => match instr_info.op {
                             OpType::None => {
@@ -254,17 +316,19 @@ pub fn run(config: Config) -> Result<String, String> {
                     },
                 }
             }
-            _ => todo!(),
+
+            // All other line types ignored in second pass
+            _ => (),
         }
     }
 
     let s = output::hex_format(&disassembly);
 
-    match config.otype {
+    match &config.otype {
         OType::STDOUT => println!("{s}"),
         OType::STRING => return Ok(s),
         OType::FILE(f) => {
-            if let Err(e) = write_assembly_to_file(&f, &s) {
+            if let Err(e) = write_assembly_to_file(f, &s) {
                 return Err(format!("Error: {e}"));
             }
         }

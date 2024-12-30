@@ -10,13 +10,13 @@ fn main() {
         process::exit(1);
     }
 
-    let config = Config::build(&args).unwrap_or_else(|err| {
+    let mut config = Config::build(&args).unwrap_or_else(|err| {
         println!("{err}");
         process::exit(1);
     });
     let should_print = matches!(config.otype, OType::STRING);
 
-    match sasm2::run(config) {
+    match sasm2::run(&mut config) {
         Ok(s) => {
             if should_print {
                 println!("{s}")

@@ -1,8 +1,8 @@
 use sasm2;
 
 fn run_string_test(assembly: &str, should_pass: bool, output: &str) {
-    let c = sasm2::Config::build_string_test(assembly);
-    let result = sasm2::run(c);
+    let mut c = sasm2::Config::build_string_test(assembly);
+    let result = sasm2::run(&mut c);
 
     if should_pass {
         assert_eq!(result, Ok(output.to_string()));
@@ -156,8 +156,8 @@ fn u16_offset_too_big() {
 }
 
 #[test]
-fn program_with_no_labels() {
-    let assembly = "ldaz  44\n\
+fn program_1_simple_instructions() {
+    let assembly = "ldaz  ff\n\
                     ldxi  00\n\
                     clc\n\
                     adcax 4000\n\
@@ -165,7 +165,32 @@ fn program_with_no_labels() {
                     adcax 4000\n\
                     staa  6000\n";
 
-    let disassembly = "a544\
+    let disassembly = "a5ff\
+                       a200\
+                       18\
+                       7d0040\
+                       e8\
+                       7d0040\
+                       8d0060";
+
+    run_string_test(assembly, true, disassembly);
+}
+
+#[test]
+fn program_1_with_labels() {
+    let assembly = "zbyte z0
+                    ldaz  .z0\n\
+                    ldxi  00\n\
+                    clc\n\
+                    label arr1 4000
+                    adcax .arr1\n\
+                    inx\n\
+                    adcax 4000\n\
+                    label arr2 5f50
+                    label arr2_offset b0
+                    staa  .arr2 .arr2_offset\n";
+
+    let disassembly = "a5ff\
                        a200\
                        18\
                        7d0040\

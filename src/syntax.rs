@@ -1,4 +1,6 @@
 // Enums for tokenizing source code lines
+
+#[derive(Copy, Clone)]
 pub enum UInt {
     U8(u8),
     U16(u16),
@@ -22,7 +24,7 @@ pub enum SourceLine {
     // Keywords
     Org(u16),
     Label(String, UInt),
-    Zbyte(String, u8),
+    ZByte(String, u8),
     Data(Vec<u8>),
 
     // Isolated labels
