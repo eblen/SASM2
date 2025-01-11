@@ -84,6 +84,19 @@ fn hex_to_uint(s: &str) -> Result<UInt, &str> {
     }
 }
 
+// Compute x-y and return only if result fits in an i8.
+// However, return it as a u8 (same bits) so that it can be stored in a disassembly.
+// This is a bit tricky in Rust, so we write a separate function.
+fn compute_diff_u16_as_u8(x: u16, y: u16) -> Option<u8> {
+    let diff: i32 = x as i32 - y as i32;
+    if diff > 127 || diff < -128 {
+        return None;
+    }
+
+    // A single byte, so endianness doesn't matter
+    return Some(diff.to_ne_bytes()[0]);
+}
+
 pub fn tokenize(line: &str) -> Result<SourceLine, &str> {
     // Remove comments
     let words: Vec<&str> = line
@@ -135,6 +148,14 @@ pub fn tokenize(line: &str) -> Result<SourceLine, &str> {
                 Ok(v) => Ok(SourceLine::Data(v)),
                 Err(_) => Err("data must be a valid hex string"),
             }
+        }
+
+        // Code markers
+        cm if cm.starts_with('.') => {
+            if words.len() != 1 {
+                return Err("Code markers must be on a line by themselves");
+            }
+            Ok(SourceLine::CodeMarker(words[0][1..].to_string()))
         }
 
         // Assume an instruction
@@ -235,6 +256,7 @@ pub fn run(config: &mut Config) -> Result<String, String> {
         };
     }
 
+    // Second parser loop. Stores machine code in "disassembly" vector.
     let mut disassembly: Vec<u8> = Vec::new();
     for s in source {
         match s {
@@ -269,8 +291,11 @@ pub fn run(config: &mut Config) -> Result<String, String> {
                     input_op_unwrapped = input_op;
                 }
 
+                // Handle op
                 match input_op_unwrapped {
                     Op::Label(_) => panic!("Internal error: label found for unwrapped op"),
+
+                    // No operand provided
                     Op::None => match instr_info.op {
                         OpType::None => (),
                         OpType::U8 => {
@@ -280,7 +305,10 @@ pub fn run(config: &mut Config) -> Result<String, String> {
                             return Err("Instruction requires a two-byte operand".to_string())
                         }
                     },
+
+                    // UInt op provided (recall that labels have already been unwrapped)
                     Op::UInt(ui_type) => match ui_type {
+                        // UInt op is a single byte
                         UInt::U8(u) => match instr_info.op {
                             OpType::None => {
                                 return Err("Instruction does not require an operand".to_string())
@@ -296,12 +324,47 @@ pub fn run(config: &mut Config) -> Result<String, String> {
                                 return Err("Instruction requires a two-byte operand".to_string())
                             }
                         },
+
+                        // UInt op is two bytes
                         UInt::U16(u) => match instr_info.op {
                             OpType::None => {
                                 return Err("Instruction does not require an operand".to_string())
                             }
                             OpType::U8 => {
-                                return Err("Instruction requires a single-byte operand".to_string())
+                                // Special handling for relative branches. Allow them to have a
+                                // two-byte operand from which we compute the real, single-byte
+                                // operand (a code offset). Normally this will come from a label.
+
+                                // Note that it is possible for the user to hardcode the relative
+                                // offset by giving a single-byte operand.
+                                if is_relative_branch_instruction(&mnemonic) {
+                                    // Not sure if it makes sense to support offsets here, but they are
+                                    // not forbidden anywhere else, so let's be consistent.
+                                    if u as u32 + offset as u32 > 0xffff {
+                                        return Err("Operand plus offset is > 0xffff".to_string());
+                                    } else {
+                                        // Should be between opcode and op
+                                        let current_code_pos = disassembly.len() as u16;
+
+                                        // Jump is from the end of the current instruction
+                                        match compute_diff_u16_as_u8(
+                                            u + offset as u16,
+                                            current_code_pos + 1,
+                                        ) {
+                                            Some(d) => disassembly.push(d),
+                                            None => {
+                                                return Err(
+                                                    "Relative branch is too far from target"
+                                                        .to_string(),
+                                                )
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    return Err(
+                                        "Instruction requires a single-byte operand".to_string()
+                                    );
+                                }
                             }
                             OpType::U16 => {
                                 if u as u32 + offset as u32 > 0xffff {

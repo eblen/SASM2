@@ -20,6 +20,11 @@ pub fn get_instr_size(mnemonic: &str) -> Result<u8, &str> {
     }
 }
 
+pub fn is_relative_branch_instruction(mnemonic: &str) -> bool {
+    let instrs = ["bpl", "bmi", "bvc", "bvs", "bcc", "bcs", "bne", "beq"];
+    return instrs.contains(&mnemonic.to_lowercase().as_str());
+}
+
 pub struct InstrInfo {
     pub opcode: u8,
     pub op: OpType,

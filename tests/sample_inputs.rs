@@ -1,5 +1,11 @@
 use sasm2;
 
+// Create a string of s repeated n times for creating blocks of repeated code.
+fn build_rep_string(s: &str, n: usize) -> String {
+    return std::iter::repeat(s).take(n).collect::<String>();
+}
+
+// Boilerplate for running an integration test
 fn run_string_test(assembly: &str, should_pass: bool, output: &str) {
     let mut c = sasm2::Config::build_string_test(assembly);
     let result = sasm2::run(&mut c);
@@ -199,4 +205,63 @@ fn program_1_with_labels() {
                        8d0060";
 
     run_string_test(assembly, true, disassembly);
+}
+
+#[test]
+fn rel_branch_backward_barely_in_range() {
+    let assembly = ["ldxi  00\n\
+                     .loop_start\n\
+                     inx\n",
+                    &build_rep_string("nop\n", 125),
+                    "beq   .loop_start\n"].join("");
+
+    let disassembly = ["a200\
+                        e8",
+                       &build_rep_string("ea", 125),
+                       "f080"].join("");
+
+    run_string_test(&assembly, true, &disassembly);
+}
+
+#[test]
+fn rel_branch_backward_barely_out_of_range() {
+    let assembly = ["ldxi  00\n\
+                     .loop_start\n\
+                     inx\n",
+                    &build_rep_string("nop\n", 126),
+                    "beq   .loop_start\n"].join("");
+
+    run_string_test(&assembly, false, "Relative branch is too far from target");
+}
+
+#[test]
+fn rel_branch_forward_barely_in_range() {
+    let assembly = ["ldxi  00\n\
+                     .loop_start\n\
+                     inx\n\
+                     beq   .loop_end\n",
+                    &build_rep_string("nop\n", 124),
+                    "jmpa  .loop_start\n\
+                     .loop_end\n"].join("");
+
+    let disassembly = ["a200\
+                        e8\
+                        f07f",
+                       &build_rep_string("ea", 124),
+                       "4c0200"].join("");
+
+    run_string_test(&assembly, true, &disassembly);
+}
+
+#[test]
+fn rel_branch_forward_barely_out_of_range() {
+    let assembly = ["ldxi  00\n\
+                     .loop_start\n\
+                     inx\n\
+                     beq   .loop_end\n",
+                    &build_rep_string("nop\n", 125),
+                    "jmpa  .loop_start\n\
+                     .loop_end\n"].join("");
+
+    run_string_test(&assembly, false, "Relative branch is too far from target");
 }
