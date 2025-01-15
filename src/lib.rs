@@ -3,6 +3,7 @@ mod output;
 mod syntax;
 mod zpm;
 
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 
 use crate::data::*;
@@ -212,8 +213,20 @@ pub fn run(config: &mut Config) -> Result<String, String> {
     // Map of label names to value
     let mut labels = HashMap::new();
 
-    // Current code byte
-    let mut code_byte: u16 = 0;
+    // Current code address (address where the current byte will be stored in memory)
+    let mut code_addr: u16 = 0;
+
+    // Current code position (position of current byte in assembly code, which is unchanged by
+    // "org" statements)
+    let mut code_pos: u16 = 0;
+
+    // Map of org values to code positions
+    let mut org_to_code_pos = BTreeMap::new();
+
+    // Insert a default, initial org of 0000. Thus, an org statement is not required before code,
+    // although most programs should have one. (One exception is code for testing SASM itself.)
+    // If an org statement does appear before any code, this entry will be removed.
+    org_to_code_pos.insert(0, 0);
 
     // First parser loop. Tokenizes source lines and collects labels.
     for (line_num, line) in assembly.lines().enumerate() {
@@ -221,7 +234,22 @@ pub fn run(config: &mut Config) -> Result<String, String> {
             Ok(tokenized_line) => {
                 match tokenized_line {
                     SourceLine::Blank => (),
-                    SourceLine::Org(_) => (),
+                    SourceLine::Org(o) => {
+                        if o < code_addr {
+                            return Err(format!(
+                                "{line_num}: Org smaller than code address: {:x}",
+                                code_addr
+                            ));
+                        }
+
+                        // If org appears before any code, remove the default, initial org.
+                        if code_pos == 0 {
+                            org_to_code_pos.clear();
+                        }
+
+                        org_to_code_pos.insert(o, code_pos);
+                        code_addr = o;
+                    }
                     SourceLine::Label(ref s, u) => {
                         if labels.contains_key(s) {
                             return Err(format!("{line_num}: Label repeated"));
@@ -235,16 +263,18 @@ pub fn run(config: &mut Config) -> Result<String, String> {
                         labels.insert(s.to_string(), UInt::U8(config.zpm.alloc(size)));
                     }
                     SourceLine::Data(ref d) => {
-                        code_byte += d.len() as u16;
+                        code_addr += d.len() as u16;
+                        code_pos += d.len() as u16;
                     }
                     SourceLine::CodeMarker(ref s) => {
                         if labels.contains_key(s) {
                             return Err(format!("{line_num}: Label repeated"));
                         }
-                        labels.insert(s.to_string(), UInt::U16(code_byte));
+                        labels.insert(s.to_string(), UInt::U16(code_addr));
                     }
                     SourceLine::Instr(ref mnemonic, _, _) => {
-                        code_byte += get_instr_size(mnemonic)? as u16;
+                        code_addr += get_instr_size(mnemonic)? as u16;
+                        code_pos += get_instr_size(mnemonic)? as u16;
                     }
                 }
 
@@ -257,15 +287,19 @@ pub fn run(config: &mut Config) -> Result<String, String> {
     }
 
     // Second parser loop. Stores machine code in "disassembly" vector.
+    code_addr = 0;
     let mut disassembly: Vec<u8> = Vec::new();
     for s in source {
         match s {
-            SourceLine::Org(_) => (),
+            SourceLine::Org(o) => {
+                code_addr = o;
+            }
             SourceLine::Data(d) => disassembly.extend(d),
             SourceLine::Instr(mnemonic, input_op, offset_type) => {
                 // Store opcode
                 let instr_info = get_instr_info(&mnemonic)?;
                 disassembly.push(instr_info.opcode);
+                code_addr += 1;
 
                 // Compute offset
                 let offset: u8;
@@ -318,6 +352,7 @@ pub fn run(config: &mut Config) -> Result<String, String> {
                                     return Err("Operand plus offset is > 0xff".to_string());
                                 } else {
                                     disassembly.push(u + offset);
+                                    code_addr += 1;
                                 }
                             }
                             OpType::U16 => {
@@ -343,15 +378,16 @@ pub fn run(config: &mut Config) -> Result<String, String> {
                                     if u as u32 + offset as u32 > 0xffff {
                                         return Err("Operand plus offset is > 0xffff".to_string());
                                     } else {
-                                        // Should be between opcode and op
-                                        let current_code_pos = disassembly.len() as u16;
-
                                         // Jump is from the end of the current instruction
+                                        // (code_addr + 1)
                                         match compute_diff_u16_as_u8(
                                             u + offset as u16,
-                                            current_code_pos + 1,
+                                            code_addr + 1,
                                         ) {
-                                            Some(d) => disassembly.push(d),
+                                            Some(d) => {
+                                                disassembly.push(d);
+                                                code_addr += 1;
+                                            }
                                             None => {
                                                 return Err(
                                                     "Relative branch is too far from target"
@@ -373,6 +409,7 @@ pub fn run(config: &mut Config) -> Result<String, String> {
                                     let bytes = (u + offset as u16).to_le_bytes();
                                     disassembly.push(bytes[0]);
                                     disassembly.push(bytes[1]);
+                                    code_addr += 2;
                                 }
                             }
                         },
@@ -385,7 +422,7 @@ pub fn run(config: &mut Config) -> Result<String, String> {
         }
     }
 
-    let s = output::hex_format(&disassembly);
+    let s = output::hex_format(&disassembly, org_to_code_pos);
 
     match &config.otype {
         OType::STDOUT => println!("{s}"),

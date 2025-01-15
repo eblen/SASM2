@@ -265,3 +265,74 @@ fn rel_branch_forward_barely_out_of_range() {
 
     run_string_test(&assembly, false, "Relative branch is too far from target");
 }
+
+#[test]
+fn multiple_orgs_with_rel_branches() {
+    let assembly = ["org 4000\n\
+                     ldxi  00\n\
+                     .loop_1_start\n\
+                     inx\n\
+                     beq   .loop_1_start\n\
+                     jmpa  4010\n\
+                     org 4010\n\
+                     ldyi  00\n\
+                     .loop_2_start\n\
+                     iny\n\
+                     beq   .loop_2_start\n\
+                     beq   .loop_1_start\n"].join("");
+
+    let disassembly = ["a200\
+                        e8\
+                        f0fd\
+                        4c1040\
+                        ffffffffffffffff\
+                        a000\
+                        c8\
+                        f0fd\
+                        f0eb"].join("");
+
+    run_string_test(&assembly, true, &disassembly);
+}
+
+#[test]
+fn org_at_code_addr() {
+    let assembly = ["org 4000\n\
+                     ldxi  00\n\
+                     .loop_1_start\n\
+                     inx\n\
+                     beq   .loop_1_start\n\
+                     org 4005\n\
+                     ldyi  00\n\
+                     .loop_2_start\n\
+                     iny\n\
+                     beq   .loop_2_start\n\
+                     beq   .loop_1_start\n"].join("");
+
+    let disassembly = ["a200\
+                        e8\
+                        f0fd\
+                        a000\
+                        c8\
+                        f0fd\
+                        f0f6"].join("");
+
+    run_string_test(&assembly, true, &disassembly);
+}
+
+#[test]
+fn org_one_less_than_code_addr() {
+    let assembly = ["org 4000\n\
+                     ldxi  00\n\
+                     .loop_1_start\n\
+                     inx\n\
+                     beq   .loop_1_start\n\
+                     org 4004\n\
+                     ldyi  00\n\
+                     .loop_2_start\n\
+                     iny\n\
+                     beq   .loop_2_start\n\
+                     beq   .loop_1_start\n"].join("");
+
+    run_string_test(&assembly, false, "5: Org smaller than code address: 4005");
+}
+
