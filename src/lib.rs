@@ -5,20 +5,24 @@ mod zpm;
 
 use std::collections::BTreeMap;
 use std::collections::HashMap;
+use std::io::Write;
 
 use crate::data::*;
+use crate::output::*;
 use crate::syntax::*;
 use crate::zpm::*;
 
+pub use crate::output::Code;
+
 pub enum IType<'a> {
-    STRING(&'a str),
-    FILE(String),
+    String(&'a str),
+    File(String),
 }
 
 pub enum OType {
-    STDOUT,
-    STRING,
-    FILE(String),
+    Stdout,
+    File(String),
+    None,
 }
 
 pub struct Config<'a> {
@@ -46,16 +50,16 @@ impl Config<'_> {
         println!("{:?}", sys);
 
         Ok(Config {
-            itype: IType::FILE(args[1].clone()),
-            otype: OType::FILE(args[2].clone()),
+            itype: IType::File(args[1].clone()),
+            otype: OType::File(args[2].clone()),
             zpm: sys,
         })
     }
 
     pub fn build_string_test<'a>(input_string: &'a str) -> Config<'a> {
         Config {
-            itype: IType::STRING(input_string),
-            otype: OType::STRING,
+            itype: IType::String(input_string),
+            otype: OType::None,
             zpm: Zpm::new_for_apple(),
         }
     }
@@ -189,10 +193,10 @@ pub fn tokenize(line: &str) -> Result<SourceLine, &str> {
     }
 }
 
-fn write_assembly_to_file(f: &str, s: &str) -> Result<(), String> {
+fn write_code_to_file<T: std::convert::AsRef<[u8]>>(f: &str, c: T) -> Result<(), String> {
     match std::fs::exists(f) {
         Ok(true) => Err(format!("File {f} already exists")),
-        Ok(false) => match std::fs::write(f, s) {
+        Ok(false) => match std::fs::write(f, c) {
             Ok(_) => Ok(()),
             Err(_) => Err(format!("Unable to write to file {f}")),
         },
@@ -200,10 +204,10 @@ fn write_assembly_to_file(f: &str, s: &str) -> Result<(), String> {
     }
 }
 
-pub fn run(config: &mut Config) -> Result<String, String> {
+pub fn run(config: &mut Config) -> Result<Code, String> {
     let assembly = match config.itype {
-        IType::STRING(s) => s,
-        IType::FILE(ref s) => &std::fs::read_to_string(s).expect("Unable to read input file"),
+        IType::String(s) => s,
+        IType::File(ref s) => &std::fs::read_to_string(s).expect("Unable to read input file"),
     };
 
     // Main data structures
@@ -422,19 +426,31 @@ pub fn run(config: &mut Config) -> Result<String, String> {
         }
     }
 
-    let s = output::hex_format(&disassembly, org_to_code_pos);
-
-    match &config.otype {
-        OType::STDOUT => println!("{s}"),
-        OType::STRING => return Ok(s),
-        OType::FILE(f) => {
-            if let Err(e) = write_assembly_to_file(f, &s) {
-                return Err(format!("Error: {e}"));
+    // Create output and print to STDOUT or file if requested.
+    // TODO: Can we use generics or traits to get rid of the redundancy?
+    let code = output::bytes_to_output(&disassembly, org_to_code_pos, CodeFormat::Hex);
+    match code {
+        Code::String(ref s) => match &config.otype {
+            OType::Stdout => println!("{s}"),
+            OType::File(f) => {
+                if let Err(e) = write_code_to_file(f, &s) {
+                    return Err(format!("Error: {e}"));
+                }
             }
+            OType::None => (),
+        },
+        Code::Bytes(ref b) => match &config.otype {
+            OType::Stdout => std::io::stdout().write_all(&b).expect("Unable to write binary to stdout"),
+            OType::File(f) => {
+                if let Err(e) = write_code_to_file(f, &b) {
+                    return Err(format!("Error: {e}"));
+                }
+            }
+            OType::None => (),
         }
     }
 
-    Ok("".to_string())
+    return Ok(code);
 }
 
 #[cfg(test)]

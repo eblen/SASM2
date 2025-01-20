@@ -11,7 +11,7 @@ fn run_string_test(assembly: &str, should_pass: bool, output: &str) {
     let result = sasm2::run(&mut c);
 
     if should_pass {
-        assert_eq!(result, Ok(output.to_string()));
+        assert_eq!(result, Ok(sasm2::Code::String(output.to_string())));
     } else {
         assert_eq!(result, Err(output.to_string()));
     }
