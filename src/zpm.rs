@@ -2,6 +2,7 @@
 pub enum Zpm {
     Apple { bytes_remaining: u16 },
     Atari2600 { next_free_byte: u16 },
+    None,
 }
 
 impl Zpm {
@@ -44,7 +45,7 @@ impl Zpm {
             // consider the specific Apple II model being used.
             Zpm::Apple { bytes_remaining: b } => {
                 if size == 0 {
-                    panic!("Request to allocate zero bytes of zero page memory");
+                    panic!("Request to allocate zero bytes of zero page memory")
                 }
 
                 if size > *b {
@@ -73,6 +74,8 @@ impl Zpm {
                 *b += size;
                 return (*b - size) as u8;
             }
+
+            Zpm::None => panic!("Internal error: zero-page manager set to none"),
         }
     }
 }

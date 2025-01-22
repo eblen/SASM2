@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+#[derive(Clone, Copy)]
 pub enum CodeFormat {
     // String of hex digits
     Hex,
@@ -21,6 +22,22 @@ pub enum Code {
 }
 
 impl CodeFormat {
+    // Attempt to create a variant from a string.
+    // Since first letters are currently all unique, just rely on them for now.
+    pub fn new(format: &str) -> Result<Self, &str> {
+        match format
+            .to_ascii_lowercase()
+            .chars()
+            .next()
+            .expect("Internal error: Empty CLI argument")
+        {
+            'h' => Ok(CodeFormat::Hex),
+            'a' => Ok(CodeFormat::AppleSM),
+            'b' => Ok(CodeFormat::Binary),
+            _ => Err("Unrecognized code format"),
+        }
+    }
+
     fn code_for_org_block(&self, start_addr: usize, end_addr: usize, bytes: &[u8]) -> Code {
         match self {
             CodeFormat::Hex => Self::org_block_for_hex(start_addr, end_addr, bytes),
@@ -52,7 +69,7 @@ impl CodeFormat {
     }
 
     // todo!
-    fn org_block_for_apple_sm(start_addr: usize, end_addr: usize, bytes: &[u8]) -> Code {
+    fn org_block_for_apple_sm(_start_addr: usize, _end_addr: usize, _bytes: &[u8]) -> Code {
         return Code::String("".to_string());
     }
 }
@@ -93,10 +110,12 @@ pub fn bytes_to_output(
     // Join org blocks
     match format {
         CodeFormat::Hex | CodeFormat::AppleSM => {
-            let code_as_string = org_blocks.iter().fold(String::new(), |code, block| match block {
-                Code::String(s) => code + &s,
-                _ => panic!("Internal error: wrong output type encountered"),
-            });
+            let code_as_string = org_blocks
+                .iter()
+                .fold(String::new(), |code, block| match block {
+                    Code::String(s) => code + &s,
+                    _ => panic!("Internal error: wrong output type encountered"),
+                });
             return Code::String(code_as_string);
         }
         CodeFormat::Binary => {
@@ -106,7 +125,7 @@ pub fn bytes_to_output(
                     Code::Bytes(b) => {
                         code.extend(b);
                         code
-                    },
+                    }
                     _ => panic!("Internal error: wrong output type encountered"),
                 });
             return Code::Bytes(code_as_bytes);

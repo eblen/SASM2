@@ -1,14 +1,10 @@
 use std::env;
 use std::process;
 
-use sasm2::{Config};
+use sasm2::Config;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    if args.len() == 1 {
-        println!("{}", sasm2::help());
-        process::exit(1);
-    }
 
     let mut config = Config::build(&args).unwrap_or_else(|err| {
         println!("{err}");
