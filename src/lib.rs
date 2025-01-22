@@ -221,7 +221,7 @@ pub fn tokenize(line: &str) -> Result<SourceLine, &str> {
         // Code markers
         cm if cm.starts_with('.') => {
             if words.len() != 1 {
-                return Err("Code markers must be on a line by themselves");
+                return Err("code markers must be on a line by themselves");
             }
             Ok(SourceLine::CodeMarker(words[0][1..].to_string()))
         }
@@ -267,7 +267,17 @@ fn write_code_to_file<T: std::convert::AsRef<[u8]>>(f: &str, c: T) -> Result<(),
     }
 }
 
+// This parent function allows us to easily append the line number to any errors regardless of how
+// and where they are generated.
 pub fn run(config: &mut Config) -> Result<Code, String> {
+    let mut line_num = 0;
+    match run_internal(config, &mut line_num) {
+        Ok(c) => Ok(c),
+        Err(e) => Err(format!("{line_num}: {e}")),
+    }
+}
+
+fn run_internal(config: &mut Config, line_num: &mut i32) -> Result<Code, String> {
     let assembly = match config.itype {
         IType::Stdin => {
             let mut s = String::new();
@@ -303,67 +313,64 @@ pub fn run(config: &mut Config) -> Result<Code, String> {
     org_to_code_pos.insert(0, 0);
 
     // First parser loop. Tokenizes source lines and collects labels.
-    for (line_num, line) in assembly.lines().enumerate() {
-        match tokenize(line) {
-            Ok(tokenized_line) => {
-                match tokenized_line {
-                    SourceLine::Blank => (),
-                    SourceLine::Org(o) => {
-                        if o < code_addr {
-                            return Err(format!(
-                                "{line_num}: Org smaller than code address: {:x}",
-                                code_addr
-                            ));
-                        }
-
-                        // If org appears before any code, remove the default, initial org.
-                        if code_pos == 0 {
-                            org_to_code_pos.clear();
-                        }
-
-                        org_to_code_pos.insert(o, code_pos);
-                        code_addr = o;
-                    }
-                    SourceLine::Label(ref s, u) => {
-                        if labels.contains_key(s) {
-                            return Err(format!("{line_num}: Label repeated"));
-                        }
-                        labels.insert(s.to_string(), u);
-                    }
-                    SourceLine::ZByte(ref s, size) => {
-                        if labels.contains_key(s) {
-                            return Err(format!("{line_num}: Label repeated"));
-                        }
-                        labels.insert(s.to_string(), UInt::U8(config.zpm.alloc(size)));
-                    }
-                    SourceLine::Data(ref d) => {
-                        code_addr += d.len() as u16;
-                        code_pos += d.len() as u16;
-                    }
-                    SourceLine::CodeMarker(ref s) => {
-                        if labels.contains_key(s) {
-                            return Err(format!("{line_num}: Label repeated"));
-                        }
-                        labels.insert(s.to_string(), UInt::U16(code_addr));
-                    }
-                    SourceLine::Instr(ref mnemonic, _, _) => {
-                        code_addr += get_instr_size(mnemonic)? as u16;
-                        code_pos += get_instr_size(mnemonic)? as u16;
-                    }
+    *line_num = 0;
+    for line in assembly.lines() {
+        *line_num += 1;
+        let tokenized_line = tokenize(line)?;
+        match tokenized_line {
+            SourceLine::Blank => (),
+            SourceLine::Org(o) => {
+                if o < code_addr {
+                    return Err("org smaller than code address".to_string());
                 }
 
-                // Store all source lines so that next loop can refer to input
-                // by line number.
-                source.push(tokenized_line);
+                // If org appears before any code, remove the default, initial org.
+                if code_pos == 0 {
+                    org_to_code_pos.clear();
+                }
+
+                org_to_code_pos.insert(o, code_pos);
+                code_addr = o;
             }
-            Err(s) => return Err(format!("{line_num}: {s}")),
-        };
+            SourceLine::Label(ref s, u) => {
+                if labels.contains_key(s) {
+                    return Err("label repeated".to_string());
+                }
+                labels.insert(s.to_string(), u);
+            }
+            SourceLine::ZByte(ref s, size) => {
+                if labels.contains_key(s) {
+                    return Err("label repeated".to_string());
+                }
+                labels.insert(s.to_string(), UInt::U8(config.zpm.alloc(size)));
+            }
+            SourceLine::Data(ref d) => {
+                code_addr += d.len() as u16;
+                code_pos += d.len() as u16;
+            }
+            SourceLine::CodeMarker(ref s) => {
+                if labels.contains_key(s) {
+                    return Err("label repeated".to_string());
+                }
+                labels.insert(s.to_string(), UInt::U16(code_addr));
+            }
+            SourceLine::Instr(ref mnemonic, _, _) => {
+                code_addr += get_instr_size(mnemonic)? as u16;
+                code_pos += get_instr_size(mnemonic)? as u16;
+            }
+        }
+
+        // Store all source lines so that next loop can refer to input
+        // by line number.
+        source.push(tokenized_line);
     }
 
     // Second parser loop. Stores machine code in "disassembly" vector.
     code_addr = 0;
+    *line_num = 0;
     let mut disassembly: Vec<u8> = Vec::new();
     for s in source {
+        *line_num += 1;
         match s {
             SourceLine::Org(o) => {
                 code_addr = o;
@@ -382,7 +389,7 @@ pub fn run(config: &mut Config) -> Result<Code, String> {
                     Offset::Label(l) => match labels.get(&l) {
                         Some(UInt::U8(u)) => offset = *u,
                         Some(UInt::U16(_)) => {
-                            return Err("Offset must be a single byte".to_string())
+                            return Err("offset must be a single byte".to_string())
                         }
                         None => panic!("Internal error: label found in second pass but not first"),
                     },
@@ -407,10 +414,10 @@ pub fn run(config: &mut Config) -> Result<Code, String> {
                     Op::None => match instr_info.op {
                         OpType::None => (),
                         OpType::U8 => {
-                            return Err("Instruction requires a single-byte operand".to_string())
+                            return Err("instruction requires a single-byte operand".to_string())
                         }
                         OpType::U16 => {
-                            return Err("Instruction requires a two-byte operand".to_string())
+                            return Err("instruction requires a two-byte operand".to_string())
                         }
                     },
 
@@ -419,25 +426,25 @@ pub fn run(config: &mut Config) -> Result<Code, String> {
                         // UInt op is a single byte
                         UInt::U8(u) => match instr_info.op {
                             OpType::None => {
-                                return Err("Instruction does not require an operand".to_string())
+                                return Err("instruction does not require an operand".to_string())
                             }
                             OpType::U8 => {
                                 if u as u16 + offset as u16 > 0xff {
-                                    return Err("Operand plus offset is > 0xff".to_string());
+                                    return Err("operand plus offset is > 0xff".to_string());
                                 } else {
                                     disassembly.push(u + offset);
                                     code_addr += 1;
                                 }
                             }
                             OpType::U16 => {
-                                return Err("Instruction requires a two-byte operand".to_string())
+                                return Err("instruction requires a two-byte operand".to_string())
                             }
                         },
 
                         // UInt op is two bytes
                         UInt::U16(u) => match instr_info.op {
                             OpType::None => {
-                                return Err("Instruction does not require an operand".to_string())
+                                return Err("instruction does not require an operand".to_string())
                             }
                             OpType::U8 => {
                                 // Special handling for relative branches. Allow them to have a
@@ -450,7 +457,7 @@ pub fn run(config: &mut Config) -> Result<Code, String> {
                                     // Not sure if it makes sense to support offsets here, but they are
                                     // not forbidden anywhere else, so let's be consistent.
                                     if u as u32 + offset as u32 > 0xffff {
-                                        return Err("Operand plus offset is > 0xffff".to_string());
+                                        return Err("operand plus offset is > 0xffff".to_string());
                                     } else {
                                         // Jump is from the end of the current instruction
                                         // (code_addr + 1)
@@ -464,7 +471,7 @@ pub fn run(config: &mut Config) -> Result<Code, String> {
                                             }
                                             None => {
                                                 return Err(
-                                                    "Relative branch is too far from target"
+                                                    "relative branch is too far from target"
                                                         .to_string(),
                                                 )
                                             }
@@ -472,13 +479,13 @@ pub fn run(config: &mut Config) -> Result<Code, String> {
                                     }
                                 } else {
                                     return Err(
-                                        "Instruction requires a single-byte operand".to_string()
+                                        "instruction requires a single-byte operand".to_string()
                                     );
                                 }
                             }
                             OpType::U16 => {
                                 if u as u32 + offset as u32 > 0xffff {
-                                    return Err("Operand plus offset is > 0xffff".to_string());
+                                    return Err("operand plus offset is > 0xffff".to_string());
                                 } else {
                                     let bytes = (u + offset as u16).to_le_bytes();
                                     disassembly.push(bytes[0]);

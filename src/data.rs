@@ -5,7 +5,7 @@ pub fn get_instr_info(mnemonic: &str) -> Result<&InstrInfo, &str> {
     match ISA.get(mnemonic) {
         Some(i) => Ok(i),
         // TODO: Detailed errors about unsupported or missing flags
-        _ => Err("Mnemonic not found"),
+        _ => Err("mnemonic not found"),
     }
 }
 
@@ -16,7 +16,7 @@ pub fn get_instr_size(mnemonic: &str) -> Result<u8, &str> {
             OpType::U8 => Ok(2),
             OpType::U16 => Ok(3),
         },
-        _ => Err("Mnemonic not found"),
+        _ => Err("mnemonic not found"),
     }
 }
 
