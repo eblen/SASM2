@@ -168,7 +168,7 @@ fn compute_diff_u16_as_u8(x: u16, y: u16) -> Option<u8> {
 pub fn tokenize(line: &str) -> Result<SourceLine, &str> {
     // Remove comments
     let words: Vec<&str> = line
-        .splitn(1, "//")
+        .split(";")
         .next()
         .unwrap()
         .split_ascii_whitespace()
