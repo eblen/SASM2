@@ -41,7 +41,7 @@ impl CodeFormat {
     fn code_for_org_block(&self, start_addr: usize, end_addr: usize, bytes: &[u8]) -> Code {
         match self {
             CodeFormat::Hex => Self::org_block_for_hex(start_addr, end_addr, bytes),
-            CodeFormat::AppleSM => Self::org_block_for_apple_sm(start_addr, end_addr, bytes),
+            CodeFormat::AppleSM => Self::org_block_for_apple_sm(start_addr, bytes),
             CodeFormat::Binary => Self::org_block_for_binary(start_addr, end_addr, bytes),
         }
     }
@@ -68,9 +68,39 @@ impl CodeFormat {
         return Code::Bytes(code_as_bytes);
     }
 
-    // todo!
-    fn org_block_for_apple_sm(_start_addr: usize, _end_addr: usize, _bytes: &[u8]) -> Code {
-        return Code::String("".to_string());
+    fn org_block_for_apple_sm(start_addr: usize, bytes: &[u8]) -> Code {
+        let bytes_per_line = 83;
+        let mut code_as_string = "".to_string();
+
+        for i in 0..bytes.len() {
+            // Start a new line
+            if i % bytes_per_line == 0 {
+
+                // Create address string
+                let current_addr = start_addr + i;
+                if current_addr > 0xffff {
+                    panic!("Internal error: found address > 0xffff while building output string");
+                }
+                let addr_string = hex::encode((current_addr as u16).to_be_bytes());
+
+                // Print line beginning
+                if i > 0 {
+                    code_as_string.push_str("\n");
+                }
+                code_as_string.push_str(&addr_string);
+                code_as_string.push_str(":");
+                code_as_string.push_str(&hex::encode(&bytes[i..i+1]));
+
+            // Append byte to current line
+            } else {
+                code_as_string.push_str(" ");
+                code_as_string.push_str(&hex::encode(&bytes[i..i+1]));
+            }
+        }
+
+        // No filler bytes for this format
+        code_as_string.push_str("\n");
+        return Code::String(code_as_string);
     }
 }
 
