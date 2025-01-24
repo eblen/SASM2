@@ -143,7 +143,7 @@ fn hex_to_uint(s: &str) -> Result<UInt, &str> {
             _ => Err(em),
         },
 
-        4 => match u16::from_str_radix(&s, 16) {
+        3 | 4 => match u16::from_str_radix(&s, 16) {
             Ok(n) => Ok(UInt::U16(n)),
             _ => Err(em),
         },
