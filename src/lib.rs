@@ -298,11 +298,11 @@ fn run_internal(config: &mut Config, line_num: &mut i32) -> Result<Code, String>
     let mut labels = HashMap::new();
 
     // Current code address (address where the current byte will be stored in memory)
-    let mut code_addr: u16 = 0;
+    let mut code_addr: usize = 0;
 
     // Current code position (position of current byte in assembly code, which is unchanged by
     // "org" statements)
-    let mut code_pos: u16 = 0;
+    let mut code_pos: usize = 0;
 
     // Map of org values to code positions
     let mut org_to_code_pos = BTreeMap::new();
@@ -320,7 +320,7 @@ fn run_internal(config: &mut Config, line_num: &mut i32) -> Result<Code, String>
         match tokenized_line {
             SourceLine::Blank => (),
             SourceLine::Org(o) => {
-                if o < code_addr {
+                if (o as usize) < code_addr {
                     return Err("org smaller than code address".to_string());
                 }
 
@@ -330,7 +330,7 @@ fn run_internal(config: &mut Config, line_num: &mut i32) -> Result<Code, String>
                 }
 
                 org_to_code_pos.insert(o, code_pos);
-                code_addr = o;
+                code_addr = o as usize;
             }
             SourceLine::Label(ref s, u) => {
                 if labels.contains_key(s) {
@@ -345,18 +345,18 @@ fn run_internal(config: &mut Config, line_num: &mut i32) -> Result<Code, String>
                 labels.insert(s.to_string(), UInt::U8(config.zpm.alloc(size)));
             }
             SourceLine::Data(ref d) => {
-                code_addr += d.len() as u16;
-                code_pos += d.len() as u16;
+                code_addr += d.len();
+                code_pos += d.len();
             }
             SourceLine::CodeMarker(ref s) => {
                 if labels.contains_key(s) {
                     return Err("label repeated".to_string());
                 }
-                labels.insert(s.to_string(), UInt::U16(code_addr));
+                labels.insert(s.to_string(), UInt::U16(code_addr as u16));
             }
             SourceLine::Instr(ref mnemonic, _, _) => {
-                code_addr += get_instr_size(mnemonic)? as u16;
-                code_pos += get_instr_size(mnemonic)? as u16;
+                code_addr += get_instr_size(mnemonic)? as usize;
+                code_pos += get_instr_size(mnemonic)? as usize;
             }
         }
 
@@ -373,7 +373,7 @@ fn run_internal(config: &mut Config, line_num: &mut i32) -> Result<Code, String>
         *line_num += 1;
         match s {
             SourceLine::Org(o) => {
-                code_addr = o;
+                code_addr = o as usize;
             }
             SourceLine::Data(d) => disassembly.extend(d),
             SourceLine::Instr(mnemonic, input_op, offset_type) => {
@@ -463,7 +463,7 @@ fn run_internal(config: &mut Config, line_num: &mut i32) -> Result<Code, String>
                                         // (code_addr + 1)
                                         match compute_diff_u16_as_u8(
                                             u + offset as u16,
-                                            code_addr + 1,
+                                            (code_addr + 1) as u16,
                                         ) {
                                             Some(d) => {
                                                 disassembly.push(d);

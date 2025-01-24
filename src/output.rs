@@ -109,7 +109,7 @@ impl CodeFormat {
 // separate functions.
 pub fn bytes_to_output(
     bytes: &[u8],
-    org_to_code_pos: BTreeMap<u16, u16>,
+    org_to_code_pos: BTreeMap<u16, usize>,
     format: CodeFormat,
 ) -> Code {
     let mut org_blocks = Vec::new();
@@ -117,7 +117,7 @@ pub fn bytes_to_output(
     // Convert values to usize for array indexing
     let mut org_iter = org_to_code_pos
         .iter()
-        .map(|x| (*x.0 as usize, *x.1 as usize));
+        .map(|x| (*x.0 as usize, *x.1));
 
     // Get first org
     let (mut prev_org, mut prev_pos) = org_iter
