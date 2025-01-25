@@ -567,17 +567,19 @@ mod tests {
     }
 
     #[test]
-    fn hex4_to_u16() {
-        match hex_to_uint("AD80") {
-            Ok(UInt::U16(i)) => assert_eq!(i, 44416),
+    fn hex3_to_u16() {
+        match hex_to_uint("D80") {
+            Ok(UInt::U16(i)) => assert_eq!(i, 3456),
             _ => panic!("Unable to convert 2-byte hex to int"),
         }
     }
 
     #[test]
-    fn hex3_to_err() {
-        let e = hex_to_uint("D80");
-        assert!(e.is_err());
+    fn hex4_to_u16() {
+        match hex_to_uint("AD80") {
+            Ok(UInt::U16(i)) => assert_eq!(i, 44416),
+            _ => panic!("Unable to convert 2-byte hex to int"),
+        }
     }
 
     #[test]

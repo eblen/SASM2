@@ -20,12 +20,12 @@ fn run_string_test(assembly: &str, should_pass: bool, output: &str) {
 // Tests Tokenizer
 #[test]
 fn org_address_too_small() {
-    run_string_test("org 88", false, "0: org must be a 2-byte address");
+    run_string_test("org 88", false, "1: org must be a 2-byte address");
 }
 
 #[test]
 fn org_address_missing() {
-    run_string_test("org", false, "0: org takes one argument");
+    run_string_test("org", false, "1: org takes one argument");
 }
 
 #[test]
@@ -40,17 +40,17 @@ fn data_forward() {
 
 #[test]
 fn data_odd_size() {
-    run_string_test("data cafedad", false, "0: data must be a valid hex string");
+    run_string_test("data cafedad", false, "1: data must be a valid hex string");
 }
 
 #[test]
 fn data_non_hex() {
-    run_string_test("data coffee", false, "0: data must be a valid hex string");
+    run_string_test("data coffee", false, "1: data must be a valid hex string");
 }
 
 #[test]
 fn data_with_spaces() {
-    run_string_test("data cafe dad", false, "0: data takes one argument");
+    run_string_test("data cafe dad", false, "1: data takes one argument");
 }
 
 #[test]
@@ -58,38 +58,38 @@ fn zbyte_size_too_big() {
     run_string_test(
         "zbyte z cafe",
         false,
-        "0: zbyte array size must be a single byte (< 0x100)",
+        "1: zbyte array size must be a single byte (< 0x100)",
     );
 }
 
 #[test]
-fn zbyte_odd_size() {
-    run_string_test("zbyte z dad", false, "0: not a valid hexadecimal number");
-}
-
-#[test]
 fn zbyte_non_hex() {
-    run_string_test("zbyte z pa", false, "0: not a valid hexadecimal number");
+    run_string_test("zbyte z pa", false, "1: not a valid hexadecimal number");
 }
 
 #[test]
-fn label_odd_size() {
-    run_string_test("label l dad", false, "0: not a valid hexadecimal number");
+fn label_size_three_okay() {
+    run_string_test("label l dad", true, "");
+}
+
+#[test]
+fn label_too_long() {
+    run_string_test("label l faced", false, "1: not a valid hexadecimal number");
 }
 
 #[test]
 fn label_non_hex() {
-    run_string_test("label l pa", false, "0: not a valid hexadecimal number");
+    run_string_test("label l pa", false, "1: not a valid hexadecimal number");
 }
 
 #[test]
-fn instr_op_odd_size() {
-    run_string_test("xxx dad", false, "0: not a valid hexadecimal number");
+fn instr_op_odd_size_three_okay() {
+    run_string_test("jmpa dad", true, "4cad0d");
 }
 
 #[test]
 fn instr_op_non_hex() {
-    run_string_test("xxx john", false, "0: not a valid hexadecimal number");
+    run_string_test("xxx john", false, "1: not a valid hexadecimal number");
 }
 
 #[test]
@@ -97,39 +97,34 @@ fn instr_offset_too_big() {
     run_string_test(
         "xxx .op cafe",
         false,
-        "0: offset must be a single byte (< 0x100)",
+        "1: offset must be a single byte (< 0x100)",
     );
 }
 
 #[test]
-fn instr_offset_odd_size() {
-    run_string_test("xxx ff dad", false, "0: not a valid hexadecimal number");
-}
-
-#[test]
 fn instr_offset_non_hex() {
-    run_string_test("xxx ff john", false, "0: not a valid hexadecimal number");
+    run_string_test("xxx ff john", false, "1: not a valid hexadecimal number");
 }
 
 // Tests Parser
 #[test]
 fn bad_instr() {
-    run_string_test("dec", false, "Mnemonic not found");
+    run_string_test("dec", false, "1: mnemonic not found");
 }
 
 #[test]
 fn needs_u8_op() {
-    run_string_test("andz", false, "Instruction requires a single-byte operand");
+    run_string_test("andz", false, "1: instruction requires a single-byte operand");
 }
 
 #[test]
 fn needs_u16_op() {
-    run_string_test("adcax", false, "Instruction requires a two-byte operand");
+    run_string_test("adcax", false, "1: instruction requires a two-byte operand");
 }
 
 #[test]
 fn op_too_small() {
-    run_string_test("oraa ff", false, "Instruction requires a two-byte operand");
+    run_string_test("oraa ff", false, "1: instruction requires a two-byte operand");
 }
 
 #[test]
@@ -137,28 +132,28 @@ fn op_too_big() {
     run_string_test(
         "ldyi cafe",
         false,
-        "Instruction requires a single-byte operand",
+        "1: instruction requires a single-byte operand",
     );
 }
 
 #[test]
 fn u8_op_not_needed() {
-    run_string_test("clc ff", false, "Instruction does not require an operand");
+    run_string_test("clc ff", false, "1: instruction does not require an operand");
 }
 
 #[test]
 fn u16_op_not_needed() {
-    run_string_test("dex ffff", false, "Instruction does not require an operand");
+    run_string_test("dex ffff", false, "1: instruction does not require an operand");
 }
 
 #[test]
 fn u8_offset_too_big() {
-    run_string_test("staz fe 2", false, "Operand plus offset is > 0xff");
+    run_string_test("staz fe 2", false, "1: operand plus offset is > 0xff");
 }
 
 #[test]
 fn u16_offset_too_big() {
-    run_string_test("staa fffe 2", false, "Operand plus offset is > 0xffff");
+    run_string_test("staa fffe 2", false, "1: operand plus offset is > 0xffff");
 }
 
 #[test]
@@ -231,7 +226,7 @@ fn rel_branch_backward_barely_out_of_range() {
                     &build_rep_string("nop\n", 126),
                     "beq   .loop_start\n"].join("");
 
-    run_string_test(&assembly, false, "Relative branch is too far from target");
+    run_string_test(&assembly, false, "130: relative branch is too far from target");
 }
 
 #[test]
@@ -263,7 +258,7 @@ fn rel_branch_forward_barely_out_of_range() {
                     "jmpa  .loop_start\n\
                      .loop_end\n"].join("");
 
-    run_string_test(&assembly, false, "Relative branch is too far from target");
+    run_string_test(&assembly, false, "4: relative branch is too far from target");
 }
 
 #[test]
@@ -333,7 +328,7 @@ fn org_one_less_than_code_addr() {
                      beq   .loop_2_start\n\
                      beq   .loop_1_start\n"].join("");
 
-    run_string_test(&assembly, false, "5: Org smaller than code address: 4005");
+    run_string_test(&assembly, false, "6: org smaller than code address");
 }
 
 #[test]
