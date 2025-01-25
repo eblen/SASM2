@@ -336,3 +336,13 @@ fn org_one_less_than_code_addr() {
     run_string_test(&assembly, false, "5: Org smaller than code address: 4005");
 }
 
+#[test]
+fn data_from_two_byte_label() {
+    run_string_test("label addr cafe\ndata  .addr", true, "feca");
+}
+
+#[test]
+fn data_from_one_byte_label() {
+    run_string_test("label addr ed\ndata  .addr", false, "2: labels used for data must be two bytes");
+}
+

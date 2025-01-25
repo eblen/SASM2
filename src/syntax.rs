@@ -17,6 +17,11 @@ pub enum Offset {
     Label(String),
 }
 
+pub enum Rawdata {
+    Bytes(Vec<u8>),
+    Label(String),
+}
+
 pub enum SourceLine {
     // Empty lines after removing comments
     Blank,
@@ -25,7 +30,7 @@ pub enum SourceLine {
     Org(u16),
     Label(String, UInt),
     ZByte(String, u8),
-    Data(Vec<u8>),
+    Data(Rawdata),
 
     // Isolated labels
     CodeMarker(String),

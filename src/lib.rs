@@ -212,9 +212,13 @@ pub fn tokenize(line: &str) -> Result<SourceLine, &str> {
             if words.len() != 2 {
                 return Err("data takes one argument");
             }
-            match hex::decode(words[1]) {
-                Ok(v) => Ok(SourceLine::Data(v)),
-                Err(_) => Err("data must be a valid hex string"),
+            if words[1].starts_with('.') {
+                Ok(SourceLine::Data(Rawdata::Label(words[1][1..].to_string())))
+            } else {
+                match hex::decode(words[1]) {
+                    Ok(v) => Ok(SourceLine::Data(Rawdata::Bytes(v))),
+                    Err(_) => Err("data must be a valid hex string"),
+                }
             }
         }
 
@@ -345,8 +349,14 @@ fn run_internal(config: &mut Config, line_num: &mut i32) -> Result<Code, String>
                 labels.insert(s.to_string(), UInt::U8(config.zpm.alloc(size)));
             }
             SourceLine::Data(ref d) => {
-                code_addr += d.len();
-                code_pos += d.len();
+                // Assume labels are two bytes, which is verified later in the second loop.
+                let mut data_size: usize = 2;
+                if let Rawdata::Bytes(b) = d {
+                    data_size = b.len();
+                }
+
+                code_addr += data_size;
+                code_pos += data_size;
             }
             SourceLine::CodeMarker(ref s) => {
                 if labels.contains_key(s) {
@@ -375,7 +385,20 @@ fn run_internal(config: &mut Config, line_num: &mut i32) -> Result<Code, String>
             SourceLine::Org(o) => {
                 code_addr = o as usize;
             }
-            SourceLine::Data(d) => disassembly.extend(d),
+            SourceLine::Data(d) => match d {
+                Rawdata::Label(l) => match labels.get(&l) {
+                    Some(UInt::U8(_)) => {
+                        return Err("labels used for data must be two bytes".to_string())
+                    }
+                    Some(UInt::U16(u)) => {
+                        let bytes = (*u).to_le_bytes();
+                        disassembly.push(bytes[0]);
+                        disassembly.push(bytes[1]);
+                    }
+                    None => panic!("Internal error: label found in second pass but not first"),
+                },
+                Rawdata::Bytes(b) => disassembly.extend(b),
+            },
             SourceLine::Instr(mnemonic, input_op, offset_type) => {
                 // Store opcode
                 let instr_info = get_instr_info(&mnemonic)?;
