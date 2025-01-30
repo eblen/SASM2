@@ -1,5 +1,3 @@
-use sasm2;
-
 // Create a string of s repeated n times for creating blocks of repeated code.
 fn build_rep_string(s: &str, n: usize) -> String {
     return std::iter::repeat(s).take(n).collect::<String>();
@@ -8,7 +6,7 @@ fn build_rep_string(s: &str, n: usize) -> String {
 // Boilerplate for running an integration test
 fn run_string_test(assembly: &str, should_pass: bool, output: &str) {
     let mut c = sasm2::Config::build_string_test(assembly);
-    let result = sasm2::run(&mut c);
+    let result = sasm2::assemble(&mut c);
 
     if should_pass {
         assert_eq!(result, Ok(sasm2::Code::String(output.to_string())));
