@@ -7,7 +7,7 @@ Stella expects as input binary files of a certain size that represent the game R
 In the "example" directory, there is a simple Atari 2600 kernel that displays scrolling color bars. It can serve as a skeleton for your own Atari 2600 project. Here are steps to run it using Stella:
 
 1) Install Stella so that you can run it from the command line, say as "stella".
-2) Assemble the example kernel with SASM2. For example, if all files are in the same directory: "./sasm2 -i ./atari2600_sample_kernel.asm -o ./atari.bin -s atari -f bin".
+2) Assemble the example kernel with SASM2. For example, if all files are in the same directory: "./sasm -i ./atari2600_sample_kernel.asm -o ./atari.bin -s atari -f bin".
 3) Run it with stella: "stella atari.bin".
 
 Congratulations! You now have a simple tool chain for creating and running your very own Atari 2600 game. Consult the many resources on the Internet to learn more.
