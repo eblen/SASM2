@@ -2,30 +2,45 @@ use std::collections::HashMap;
 use std::sync::LazyLock;
 
 pub fn get_instr_info(mnemonic: &str) -> Result<&InstrInfo, &str> {
-    match ISA.get(mnemonic) {
+    match ISA_BY_MNEMONIC.get(mnemonic) {
         Some(i) => Ok(i),
         // TODO: Detailed errors about unsupported or missing flags
-        _ => Err("mnemonic not found"),
+        None => Err("mnemonic not found"),
     }
 }
 
 pub fn get_instr_size(mnemonic: &str) -> Result<u8, &str> {
-    match ISA.get(mnemonic) {
+    match ISA_BY_MNEMONIC.get(mnemonic) {
         Some(i) => match i.op {
             OpType::None => Ok(1),
             OpType::U8 => Ok(2),
             OpType::U16 => Ok(3),
         },
-        _ => Err("mnemonic not found"),
+        None => Err("mnemonic not found"),
     }
 }
 
+pub fn get_instr_info_from_opcode(opcode: u8) -> Option<&'static InstrInfo> {
+    return ISA_BY_OPCODE[opcode as usize];
+}
+
+pub fn get_instr_size_from_opcode(opcode: u8) -> Option<u8> {
+    match ISA_BY_OPCODE[opcode as usize] {
+        Some(i) => match i.op {
+            OpType::None => Some(1),
+            OpType::U8 => Some(2),
+            OpType::U16 => Some(3),
+        },
+        None => None,
+    }
+}
 pub fn is_relative_branch_instruction(mnemonic: &str) -> bool {
     let instrs = ["bpl", "bmi", "bvc", "bvs", "bcc", "bcs", "bne", "beq"];
     return instrs.contains(&mnemonic.to_lowercase().as_str());
 }
 
 pub struct InstrInfo {
+    pub mnemonic: String,
     pub opcode: u8,
     pub op: OpType,
 }
@@ -37,10 +52,10 @@ pub enum OpType {
 }
 
 fn new_instr(mnemonic: &str, opcode: u8, op: OpType) -> (String, InstrInfo) {
-    (mnemonic.to_string(), InstrInfo { opcode, op })
+    (mnemonic.to_string(), InstrInfo { mnemonic: mnemonic.to_string(), opcode, op })
 }
 
-static ISA: LazyLock<HashMap<String, InstrInfo>> = LazyLock::new(|| {
+static ISA_BY_MNEMONIC: LazyLock<HashMap<String, InstrInfo>> = LazyLock::new(|| {
     HashMap::from([
         new_instr("adci", 0x69, OpType::U8),
         new_instr("adcz", 0x65, OpType::U8),
@@ -194,4 +209,12 @@ static ISA: LazyLock<HashMap<String, InstrInfo>> = LazyLock::new(|| {
         new_instr("styzx", 0x94, OpType::U8),
         new_instr("stya", 0x8c, OpType::U16),
     ])
+});
+
+static ISA_BY_OPCODE: LazyLock<[Option<&InstrInfo>; 256]> = LazyLock::new(|| {
+    let mut a = [None; 256];
+    for (_, instr) in ISA_BY_MNEMONIC.iter() {
+        a[instr.opcode as usize] = Some(instr);
+    }
+    a
 });
