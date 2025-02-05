@@ -16,6 +16,66 @@ fn get_instr_sizes_for_bytes(bytes: &Vec<u8>) -> Vec<u8> {
     byte_to_instr_size
 }
 
+fn get_code_regions(instr_sizes: &Vec<u8>) -> Vec<(usize, usize)> {
+    const MIN_REGION_SIZE: usize = 10;
+    let mut regions = Vec::new();
+
+    // Compute possible code region starting from each byte
+    for start_pos in 0..instr_sizes.len() {
+        let mut end_pos = start_pos;
+
+        // Compute length of code region
+        while end_pos < instr_sizes.len() {
+            if instr_sizes[end_pos] == 0 {
+                break;
+            }
+            end_pos += instr_sizes[end_pos] as usize;
+        }
+
+        if end_pos - start_pos > MIN_REGION_SIZE {
+            regions.push((start_pos, end_pos));
+        }
+    }
+
+    // Sort regions from largest to smallest
+    regions.sort_by(|a, b| (b.1 - b.0).cmp(&(a.1 - a.0)));
+
+    // Helper function
+    fn regions_overlap(r1: (usize, usize), r2: (usize, usize)) -> bool {
+        if r1.1 < r2.0 {
+            return false;
+        } else if r2.1 < r1.0 {
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    // Only keep regions that do not overlap a larger region
+    let mut num_selected_regions = 0;
+    for i in 0..regions.len() {
+        let mut keep_region = true;
+
+        for j in 0..num_selected_regions {
+            if regions_overlap(regions[i], regions[j]) {
+                keep_region = false;
+                break;
+            }
+        }
+
+        if keep_region {
+            regions[num_selected_regions] = regions[i];
+            num_selected_regions += 1;
+        }
+    }
+
+    // Remove non-selected regions and sort by starting value
+    regions.resize(num_selected_regions, (0,0));
+    regions.sort_by(|a, b| a.0.cmp(&b.0));
+
+    return regions;
+}
+
 pub fn disassemble(config: &mut Config) -> Result<Code, String> {
     let bytes = match config.itype {
         IType::Stdin => {
@@ -40,7 +100,11 @@ pub fn disassemble(config: &mut Config) -> Result<Code, String> {
     };
 
     let bytes_to_instr_size = get_instr_sizes_for_bytes(&bytes);
-    println!("{:?}", bytes_to_instr_size);
+    let code_regions = get_code_regions(&bytes_to_instr_size);
+
+    for (s,e) in code_regions {
+        println!("{s} {e}");
+    }
 
     Ok(Code::String("".to_string()))
 }
