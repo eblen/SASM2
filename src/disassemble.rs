@@ -77,7 +77,54 @@ fn get_code_regions(instr_sizes: &Vec<u8>) -> Vec<(usize, usize)> {
 }
 
 fn get_assembly_from_bytes(bytes: &Vec<u8>, regions: &Vec<(usize, usize)>) -> Code {
-    return Code::String("".to_string());
+    let mut assembly = String::new();
+    let mut last_region_end = 0;
+
+    for (start, end) in regions {
+        // Write data before region
+        if last_region_end < *start {
+            assembly.push_str("data  ");
+            assembly.push_str(&hex::encode(&bytes[last_region_end..*start]));
+            assembly.push_str("\n");
+        }
+
+        // Write code in region
+        let err_string = "Internal error: found invalid opcode while creating assembly";
+        let mut code_pos = *start;
+        while code_pos < *end {
+            let instr_info = get_instr_info_from_opcode(bytes[code_pos]).expect(err_string);
+            let instr_size: usize = get_instr_size_from_opcode(bytes[code_pos]).expect(err_string).into();
+
+            // Write mnemonic
+            assembly.push_str(&instr_info.mnemonic);
+            assembly.push_str(&" ".repeat(6 - instr_info.mnemonic.len()));
+
+            // Write operand
+            // Remember to write two-byte operands in big endian.
+            if instr_size > 2 {
+                assembly.push_str(&format!("{:x}", bytes[code_pos + 2]));
+                // assembly.push_str(&hex::encode(bytes[code_pos + 2]));
+            }
+            if instr_size > 1 {
+                assembly.push_str(&format!("{:02x}", bytes[code_pos + 1]));
+                // assembly.push_str(&hex::encode(bytes[code_pos + 1]));
+            }
+            assembly.push_str("\n");
+
+            code_pos += instr_size;
+        }
+
+        last_region_end = *end;
+    }
+
+    // Write data after last region
+    if last_region_end < bytes.len() {
+        assembly.push_str("data  ");
+        assembly.push_str(&hex::encode(&bytes[last_region_end..bytes.len()]));
+        assembly.push_str("\n");
+    }
+
+    Code::String(assembly)
 }
 
 pub fn disassemble(config: &mut Config) -> Result<Code, String> {
