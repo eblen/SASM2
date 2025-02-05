@@ -70,10 +70,14 @@ fn get_code_regions(instr_sizes: &Vec<u8>) -> Vec<(usize, usize)> {
     }
 
     // Remove non-selected regions and sort by starting value
-    regions.resize(num_selected_regions, (0,0));
+    regions.resize(num_selected_regions, (0, 0));
     regions.sort_by(|a, b| a.0.cmp(&b.0));
 
     return regions;
+}
+
+fn get_assembly_from_bytes(bytes: &Vec<u8>, regions: &Vec<(usize, usize)>) -> Code {
+    return Code::String("".to_string());
 }
 
 pub fn disassemble(config: &mut Config) -> Result<Code, String> {
@@ -86,12 +90,10 @@ pub fn disassemble(config: &mut Config) -> Result<Code, String> {
             }
         }
 
-        IType::String(ref s) => {
-            match hex::decode(s) {
-                Ok(b) => b,
-                _ => return Err("Cannot decode input string".to_string()),
-            }
-        }
+        IType::String(ref s) => match hex::decode(s) {
+            Ok(b) => b,
+            _ => return Err("Cannot decode input string".to_string()),
+        },
 
         IType::File(ref f) => match std::fs::read(f) {
             Ok(b) => b,
@@ -101,12 +103,10 @@ pub fn disassemble(config: &mut Config) -> Result<Code, String> {
 
     let bytes_to_instr_size = get_instr_sizes_for_bytes(&bytes);
     let code_regions = get_code_regions(&bytes_to_instr_size);
+    let assembly = get_assembly_from_bytes(&bytes, &code_regions);
+    write_code(&assembly, &config.otype)?;
 
-    for (s,e) in code_regions {
-        println!("{s} {e}");
-    }
-
-    Ok(Code::String("".to_string()))
+    Ok(assembly)
 }
 
 #[cfg(test)]

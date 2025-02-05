@@ -1,4 +1,7 @@
 use std::collections::BTreeMap;
+use std::io::Write;
+
+use crate::config::OType;
 
 #[derive(Clone, Copy)]
 pub enum CodeFormat {
@@ -75,7 +78,6 @@ impl CodeFormat {
         for i in 0..bytes.len() {
             // Start a new line
             if i % bytes_per_line == 0 {
-
                 // Create address string
                 let current_addr = start_addr + i;
                 if current_addr > 0xffff {
@@ -89,12 +91,12 @@ impl CodeFormat {
                 }
                 code_as_string.push_str(&addr_string);
                 code_as_string.push_str(":");
-                code_as_string.push_str(&hex::encode(&bytes[i..i+1]));
+                code_as_string.push_str(&hex::encode(&bytes[i..i + 1]));
 
             // Append byte to current line
             } else {
                 code_as_string.push_str(" ");
-                code_as_string.push_str(&hex::encode(&bytes[i..i+1]));
+                code_as_string.push_str(&hex::encode(&bytes[i..i + 1]));
             }
         }
 
@@ -115,9 +117,7 @@ pub fn bytes_to_output(
     let mut org_blocks = Vec::new();
 
     // Convert values to usize for array indexing
-    let mut org_iter = org_to_code_pos
-        .iter()
-        .map(|x| (*x.0 as usize, *x.1));
+    let mut org_iter = org_to_code_pos.iter().map(|x| (*x.0 as usize, *x.1));
 
     // Get first org
     let (mut prev_org, mut prev_pos) = org_iter
@@ -161,4 +161,44 @@ pub fn bytes_to_output(
             return Code::Bytes(code_as_bytes);
         }
     }
+}
+
+// Functions for outputting the final result
+
+fn write_code_to_file<T: std::convert::AsRef<[u8]>>(f: &str, c: T) -> Result<(), String> {
+    match std::fs::exists(f) {
+        Ok(true) => Err(format!("File {f} already exists")),
+        Ok(false) => match std::fs::write(f, c) {
+            Ok(_) => Ok(()),
+            Err(_) => Err(format!("Unable to write to file {f}")),
+        },
+        Err(_) => Err(format!("Unable to check existence of file {f}")),
+    }
+}
+
+pub fn write_code(code: &Code, otype: &OType) -> Result<(), String> {
+    match code {
+        Code::String(ref s) => match &otype {
+            OType::Stdout => println!("{s}"),
+            OType::File(f) => {
+                if let Err(e) = write_code_to_file(f, &s) {
+                    return Err(format!("Error: {e}"));
+                }
+            }
+            OType::None => (),
+        },
+        Code::Bytes(ref b) => match &otype {
+            OType::Stdout => std::io::stdout()
+                .write_all(&b)
+                .expect("Unable to write binary to stdout"),
+            OType::File(f) => {
+                if let Err(e) = write_code_to_file(f, &b) {
+                    return Err(format!("Error: {e}"));
+                }
+            }
+            OType::None => (),
+        },
+    }
+
+    Ok(())
 }

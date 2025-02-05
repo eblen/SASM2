@@ -1,7 +1,6 @@
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::io::Read;
-use std::io::Write;
 
 use crate::config::*;
 use crate::data::*;
@@ -132,17 +131,6 @@ fn tokenize(line: &str) -> Result<SourceLine, &str> {
 
             Ok(SourceLine::Instr(words[0].to_string(), op, offset))
         }
-    }
-}
-
-fn write_code_to_file<T: std::convert::AsRef<[u8]>>(f: &str, c: T) -> Result<(), String> {
-    match std::fs::exists(f) {
-        Ok(true) => Err(format!("File {f} already exists")),
-        Ok(false) => match std::fs::write(f, c) {
-            Ok(_) => Ok(()),
-            Err(_) => Err(format!("Unable to write to file {f}")),
-        },
-        Err(_) => Err(format!("Unable to check existence of file {f}")),
     }
 }
 
@@ -401,30 +389,9 @@ fn run_internal(config: &mut Config, line_num: &mut i32) -> Result<Code, String>
         }
     }
 
-    // Create output and print to STDOUT or file if requested.
+    // Create and write the final output
     let code = bytes_to_output(&disassembly, org_to_code_pos, config.cformat);
-    match code {
-        Code::String(ref s) => match &config.otype {
-            OType::Stdout => println!("{s}"),
-            OType::File(f) => {
-                if let Err(e) = write_code_to_file(f, &s) {
-                    return Err(format!("Error: {e}"));
-                }
-            }
-            OType::None => (),
-        },
-        Code::Bytes(ref b) => match &config.otype {
-            OType::Stdout => std::io::stdout()
-                .write_all(&b)
-                .expect("Unable to write binary to stdout"),
-            OType::File(f) => {
-                if let Err(e) = write_code_to_file(f, &b) {
-                    return Err(format!("Error: {e}"));
-                }
-            }
-            OType::None => (),
-        },
-    }
+    write_code(&code, &config.otype)?;
 
     return Ok(code);
 }
