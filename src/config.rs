@@ -20,6 +20,7 @@ pub struct Config {
     pub otype: OType,
     pub zpm: Zpm,
     pub cformat: CodeFormat,
+    pub addr: u16,
 }
 
 fn help() -> &'static str {
@@ -28,24 +29,27 @@ fn help() -> &'static str {
             -h: This help message
             -i: Input  file (STDIN  is default)
             -o: Output file (STDOUT is default)
-            -s: System:
+            -s: System: (assembler only)
                 apple: Apple II (default)
                 atari: Atari 2600
-            -f: Code output format:
+            -f: Code output format: (assembler only)
                 hex:   String of hex digits (default)
                 apple: Apple II system monitor
                 bin:   Machine code
+            -a: Starting address in hex (disassembler only)
+                0x0000 is default. Must be < 0x10000.
     "};
 }
 
 impl Config {
-    pub fn build(args: &[String]) -> Result<Config, &str> {
+    pub fn build(args: &[String]) -> Result<Config, String> {
         // Flags to keep track of state while parsing the command line.
         enum CLFlag {
             Ifile,
             Ofile,
             Sys,
             Format,
+            Addr,
             None,
         }
 
@@ -55,6 +59,7 @@ impl Config {
             otype: OType::Stdout,
             zpm: Zpm::None, // Defaults to AppleII
             cformat: CodeFormat::Hex,
+            addr: 0,
         };
 
         // Simple but strict argument parser. All flags are optional.
@@ -66,15 +71,16 @@ impl Config {
             if a.starts_with('-') {
                 if let CLFlag::None = current_flag {
                     match a.as_str() {
-                        "-h" => return Err(help()),
+                        "-h" => return Err(help().to_string()),
                         "-i" => current_flag = CLFlag::Ifile,
                         "-o" => current_flag = CLFlag::Ofile,
                         "-s" => current_flag = CLFlag::Sys,
                         "-f" => current_flag = CLFlag::Format,
-                        _ => return Err("Invalid flag: {a}"),
+                        "-a" => current_flag = CLFlag::Addr,
+                        _ => return Err(format!("Invalid flag: {a}")),
                     }
                 } else {
-                    return Err("Flag {a} cannot follow another flag");
+                    return Err(format!("Flag {a} cannot follow another flag"));
                 }
 
             // Process arguments
@@ -84,7 +90,13 @@ impl Config {
                     CLFlag::Ofile => config.otype = OType::File(a.to_string()),
                     CLFlag::Sys => config.zpm = Zpm::new(a)?,
                     CLFlag::Format => config.cformat = CodeFormat::new(a)?,
-                    CLFlag::None => return Err("Argument {a} must immediately follow a flag"),
+                    CLFlag::Addr => {
+                        config.addr = match u16::from_str_radix(&a, 16) {
+                            Ok(n) => n,
+                            _ => return Err("Invalid starting address".to_string()),
+                        }
+                    }
+                    CLFlag::None => return Err(format!("Argument {a} must immediately follow a flag")),
                 }
 
                 current_flag = CLFlag::None;
@@ -100,7 +112,7 @@ impl Config {
         match config.zpm {
             Zpm::Atari2600 { .. } => match config.cformat {
                 CodeFormat::AppleSM => {
-                    return Err("Apple System Monitor output not compatible with Atari")
+                    return Err("Apple System Monitor output not compatible with Atari".to_string())
                 }
                 _ => (),
             },
@@ -116,6 +128,7 @@ impl Config {
             otype: OType::None,
             zpm: Zpm::new_for_apple(),
             cformat: CodeFormat::Hex,
+            addr: 0,
         }
     }
 }
