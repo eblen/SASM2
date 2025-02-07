@@ -258,7 +258,7 @@ fn run_internal(config: &mut Config, line_num: &mut i32) -> Result<Code, String>
                         disassembly.push(bytes[0]);
                         disassembly.push(bytes[1]);
                     }
-                    None => panic!("Internal error: label found in second pass but not first"),
+                    None => panic!("Internal error: label {l} found in second pass but not first"),
                 },
                 Rawdata::Bytes(b) => disassembly.extend(b),
             },
@@ -277,7 +277,7 @@ fn run_internal(config: &mut Config, line_num: &mut i32) -> Result<Code, String>
                         Some(UInt::U16(_)) => {
                             return Err("offset must be a single byte".to_string())
                         }
-                        None => panic!("Internal error: label found in second pass but not first"),
+                        None => panic!("Internal error: label {l} found in second pass but not first"),
                     },
                 }
 
@@ -286,7 +286,7 @@ fn run_internal(config: &mut Config, line_num: &mut i32) -> Result<Code, String>
                 if let Op::Label(l) = input_op {
                     input_op_unwrapped = match labels.get(&l) {
                         Some(u) => Op::UInt(*u),
-                        None => panic!("Internal error: label found in second pass but not first"),
+                        None => panic!("Internal error: label {l} found in second pass but not first"),
                     }
                 } else {
                     input_op_unwrapped = input_op;
