@@ -123,7 +123,10 @@ fn get_assembly_from_bytes(
                         // relative address
                         let instr_addr = start_addr as usize + current_byte + instr_size;
                         let abs_addr = instr_addr as isize + bytes[current_byte + 1] as i8 as isize;
-                        assert!(abs_addr >= 0, "Error: relative address has absolute address less than 0");
+                        assert!(
+                            abs_addr >= 0,
+                            "Error: relative address has absolute address less than 0"
+                        );
                         abs_addr as usize
                     }
                     3 => {
@@ -192,23 +195,65 @@ fn get_assembly_from_bytes(
     current_line += 1;
 
     for s in source {
-        // Watch out for labels not on an instruction or data section boundary
-        while s.0 as usize > next_labeled_addr {
-            eprintln!("Warning: address {:04x} inside line {}", next_labeled_addr, current_line - 1);
+        // Check for skipped labels that reference inside the previous line.
+        while (s.0 as usize) > next_labeled_addr {
+            eprintln!(
+                "Warning: address {:04x} inside line {}",
+                next_labeled_addr,
+                current_line - 1
+            );
             next_labeled_addr = *labeled_addr_iter.next().expect(addr_error);
         }
 
-        // Insert label
-        if s.0 as usize == next_labeled_addr {
-            assembly.push_str(&format!(".{:04x}\n", s.0));
+        // Handle data region
+        if s.1.starts_with("data ") {
+            let data_string =
+                s.1.split_ascii_whitespace()
+                    .skip(1)
+                    .next()
+                    .expect("Internal error: empty data region found");
+            let mut start_byte = 0;
+
+            // Print data sub-regions as defined by labels
+            while next_labeled_addr < s.0 as usize + data_string.len() / 2 {
+                let end_byte = 2 * (next_labeled_addr - s.0 as usize);
+
+                // Print data region only if not empty
+                if end_byte > start_byte {
+                    assembly.push_str("data ");
+                    assembly.push_str(&data_string[start_byte..end_byte]);
+                    assembly.push_str("\n");
+                    current_line += 1;
+                }
+
+                // Print label
+                assembly.push_str(&format!(".{:04x}\n", next_labeled_addr));
+                current_line += 1;
+
+                next_labeled_addr = *labeled_addr_iter.next().expect(addr_error);
+                start_byte = end_byte;
+            }
+
+            // Print remaining data
+            assembly.push_str("data ");
+            assembly.push_str(&data_string[start_byte..data_string.len()]);
+            assembly.push_str("\n");
             current_line += 1;
-            next_labeled_addr = *labeled_addr_iter.next().expect(addr_error);
-        }
 
-        // Insert source line
-        assembly.push_str(&s.1);
-        assembly.push_str("\n");
-        current_line += 1;
+        // Instruction
+        } else {
+            // Insert label if needed
+            if s.0 as usize == next_labeled_addr {
+                assembly.push_str(&format!(".{:04x}\n", next_labeled_addr));
+                current_line += 1;
+                next_labeled_addr = *labeled_addr_iter.next().expect(addr_error);
+            }
+
+            // Insert source line
+            assembly.push_str(&s.1);
+            assembly.push_str("\n");
+            current_line += 1;
+        }
     }
 
     Code::String(assembly)
