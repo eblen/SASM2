@@ -21,6 +21,7 @@ pub struct Config {
     pub zpm: Zpm,
     pub cformat: CodeFormat,
     pub addr: u16,
+    pub min_region_size: usize,
 }
 
 fn help() -> &'static str {
@@ -38,6 +39,8 @@ fn help() -> &'static str {
                 bin:   Machine code
             -a: Starting address in hex (disassembler only)
                 0x0000 is default. Must be < 0x10000.
+            -m: Minimum size for a code region (disassembler only)
+                10 is default.
     "};
 }
 
@@ -50,6 +53,7 @@ impl Config {
             Sys,
             Format,
             Addr,
+            MinRegSize,
             None,
         }
 
@@ -60,6 +64,7 @@ impl Config {
             zpm: Zpm::None, // Defaults to AppleII
             cformat: CodeFormat::Hex,
             addr: 0,
+            min_region_size: 10,
         };
 
         // Simple but strict argument parser. All flags are optional.
@@ -77,6 +82,7 @@ impl Config {
                         "-s" => current_flag = CLFlag::Sys,
                         "-f" => current_flag = CLFlag::Format,
                         "-a" => current_flag = CLFlag::Addr,
+                        "-m" => current_flag = CLFlag::MinRegSize,
                         _ => return Err(format!("Invalid flag: {a}")),
                     }
                 } else {
@@ -96,7 +102,15 @@ impl Config {
                             _ => return Err("Invalid starting address".to_string()),
                         }
                     }
-                    CLFlag::None => return Err(format!("Argument {a} must immediately follow a flag")),
+                    CLFlag::MinRegSize => {
+                        config.min_region_size = match a.parse() {
+                            Ok(n) => n,
+                            _ => return Err("Invalid minimum region size".to_string()),
+                        }
+                    }
+                    CLFlag::None => {
+                        return Err(format!("Argument {a} must immediately follow a flag"))
+                    }
                 }
 
                 current_flag = CLFlag::None;
@@ -129,6 +143,7 @@ impl Config {
             zpm: Zpm::new_for_apple(),
             cformat: CodeFormat::Hex,
             addr: 0,
+            min_region_size: 10,
         }
     }
 }

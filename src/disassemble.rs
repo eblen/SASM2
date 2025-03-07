@@ -17,8 +17,7 @@ fn get_instr_sizes_for_bytes(bytes: &Vec<u8>) -> Vec<u8> {
     byte_to_instr_size
 }
 
-fn get_code_regions(instr_sizes: &Vec<u8>) -> Vec<(usize, usize)> {
-    const MIN_REGION_SIZE: usize = 10;
+fn get_code_regions(instr_sizes: &Vec<u8>, min_region_size: usize) -> Vec<(usize, usize)> {
     let mut regions = Vec::new();
 
     // Compute possible code region starting from each byte
@@ -33,7 +32,7 @@ fn get_code_regions(instr_sizes: &Vec<u8>) -> Vec<(usize, usize)> {
             end_pos += instr_sizes[end_pos] as usize;
         }
 
-        if end_pos - start_pos > MIN_REGION_SIZE {
+        if end_pos - start_pos > min_region_size {
             regions.push((start_pos, end_pos));
         }
     }
@@ -281,7 +280,7 @@ pub fn disassemble(config: &mut Config) -> Result<Code, String> {
     };
 
     let bytes_to_instr_size = get_instr_sizes_for_bytes(&bytes);
-    let code_regions = get_code_regions(&bytes_to_instr_size);
+    let code_regions = get_code_regions(&bytes_to_instr_size, config.min_region_size);
     let assembly = get_assembly_from_bytes(&bytes, &code_regions, config.addr);
     write_code(&assembly, &config.otype)?;
 
